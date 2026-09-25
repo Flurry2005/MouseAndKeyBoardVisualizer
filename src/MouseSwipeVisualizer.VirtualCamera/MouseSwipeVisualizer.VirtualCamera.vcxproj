@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    User-mode Media Foundation custom media source for the Windows 11 virtual camera
+    (MFCreateVirtualCamera, MFVirtualCameraType_SoftwareCameraSource). Not a driver.
+    Build: MSBuild from Visual Studio 2022 ("Desktop development with C++" + Windows 11 SDK).
+    `dotnet build` of the app builds this project automatically (see MouseSwipeVisualizer.csproj).
+  -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{5C0E3E2A-7B7E-4C1B-9F0B-2D1E6A3C4B11}</ProjectGuid>
+    <RootNamespace>MouseSwipeVisualizerVirtualCamera</RootNamespace>
+    <!-- 10.0.26100.0 is installed on the development machine; any SDK >= 10.0.22000 has mfvirtualcamera.h. -->
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\obj\$(Configuration)\</IntDir>
+    <TargetName>MouseSwipeVisualizer.VirtualCamera</TargetName>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <PreprocessorDefinitions>_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <ModuleDefinitionFile>MouseSwipeVisualizer.VirtualCamera.def</ModuleDefinitionFile>
+      <AdditionalDependencies>mfplat.lib;mfuuid.lib;mf.lib;mfreadwrite.lib;mfsensorgroup.lib;cfgmgr32.lib;advapi32.lib;ole32.lib;propsys.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <!-- MFCreateSensorProfile* live in mfsensorgroup.dll; delay-load keeps the DLL loadable everywhere. -->
+      <DelayLoadDLLs>mfsensorgroup.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+      <CETCompat>true</CETCompat>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <!-- Static CRT: the DLL is loaded by the Frame Server services; no VC++ redistributable needed. -->
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="Common.h" />
+    <ClInclude Include="PixelConvert.h" />
+    <ClInclude Include="FrameLink.h" />
+    <ClInclude Include="SwipeMediaStream.h" />
+    <ClInclude Include="SwipeMediaSource.h" />
+    <ClInclude Include="SwipeMediaSourceActivate.h" />
+    <ClInclude Include="CameraControl.h" />
+    <ClInclude Include="..\MouseSwipeVisualizer.Shared\SharedFrameProtocol.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="PixelConvert.cpp" />
+    <ClCompile Include="FrameLink.cpp" />
+    <ClCompile Include="SwipeMediaStream.cpp" />
+    <ClCompile Include="SwipeMediaSource.cpp" />
+    <ClCompile Include="SwipeMediaSourceActivate.cpp" />
+    <ClCompile Include="CameraControl.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MouseSwipeVisualizer.VirtualCamera.def" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

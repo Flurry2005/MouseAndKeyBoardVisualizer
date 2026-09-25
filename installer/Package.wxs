@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mouse Swipe Visualizer installer (WiX v5).
+
+  Install (per machine, elevated):
+    - MouseSwipeVisualizer.exe (self-contained) + MouseSwipeVisualizer.VirtualCamera.dll into Program Files
+    - COM registration of the media source in HKLM (the Frame Server services only see HKLM)
+    - after InstallFinalize, as the installing user (not elevated), the app is run with the
+      "camera-register" command: it creates "Mouse Swipe Visualizer Camera" (System lifetime,
+      CurrentUser access) for that account. The app also re-registers it idempotently at every
+      start, so other accounts get it on first launch.
+
+  Uninstall (full removal only, not upgrades): an elevated deferred custom action BEFORE RemoveFiles
+    runs the app with the "camera-uninstall-elevated" command: it stops the camera services, removes
+    every camera device created from our CLSID (all users), deletes the COM registration and any
+    development copies. Then Windows Installer removes the files. No orphaned camera remains.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Mouse Swipe Visualizer"
+           Manufacturer="Mouse Swipe Visualizer"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="1C944D2D-AD8D-4C2A-99F7-0BF3DBAA1366"
+           Scope="perMachine"
+           Compressed="yes"
+           InstallerVersion="500">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Mouse Swipe Visualizer is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Windows 11 (build 22000) is required for the virtual camera; the app itself runs on Windows 10. -->
+    <Property Id="ARPCOMMENTS" Value="Mouse swipe visualizer with a native Windows virtual camera (Mouse Swipe Visualizer Camera)." />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="MouseSwipeVisualizer" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="AppExe" Bitness="always64">
+        <File Id="AppExeFile" Source="$(var.PublishDir)MouseSwipeVisualizer.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Mouse Swipe Visualizer"
+                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+          <Shortcut Id="StartMenuHeadlessShortcut" Directory="ProgramMenuFolder" Name="Mouse Swipe Visualizer (tray only)"
+                    WorkingDirectory="INSTALLFOLDER" Arguments="--headless" Advertise="yes" />
+        </File>
+      </Component>
+
+      <Component Id="CameraMediaSource" Bitness="always64">
+        <File Id="CameraDll" Source="$(var.PublishDir)MouseSwipeVisualizer.VirtualCamera.dll" KeyPath="yes" />
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\CLSID\{0728D89A-2065-4F45-85F7-B128DA227817}">
+          <RegistryValue Type="string" Value="Mouse Swipe Visualizer virtual camera media source" />
+          <RegistryKey Key="InprocServer32">
+            <RegistryValue Type="string" Value="[#CameraDll]" />
+            <RegistryValue Name="ThreadingModel" Type="string" Value="Both" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+
+      <Component Id="Readme" Bitness="always64">
+        <File Id="ReadmeFile" Source="$(var.RepoRoot)README.md" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="Mouse Swipe Visualizer" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <!-- Uninstall: remove cameras + registration while the files still exist (elevated, as LocalSystem). -->
+    <CustomAction Id="RemoveVirtualCameras" FileRef="AppExeFile" ExeCommand="--camera-uninstall-elevated"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <!-- Install: create the camera for the installing user (runs impersonated, after the transaction). -->
+    <CustomAction Id="RegisterVirtualCamera" FileRef="AppExeFile" ExeCommand="--camera-register"
+                  Execute="immediate" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RemoveVirtualCameras" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RegisterVirtualCamera" After="InstallFinalize" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

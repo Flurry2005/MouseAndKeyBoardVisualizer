@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "detail": "C# app + native virtual camera DLL (needs VS 2022 C++ tools, found automatically)",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/MouseSwipeVisualizer.sln", "-c", "Debug", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build release",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/MouseSwipeVisualizer.sln", "-c", "Release", "/property:GenerateFullPaths=true"],
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build installer (MSI)",
+      "detail": "publish self-contained + WiX MSI -> installer/bin/x64/Release",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File '${workspaceFolder}/installer/build-installer.ps1'",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "camera: status",
+      "type": "shell",
+      "command": "& '${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe' --camera-status | Out-Host",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "dependsOn": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "camera: install / repair (UAC)",
+      "type": "shell",
+      "command": "& '${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe' --camera-install | Out-Host",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "dependsOn": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "camera: test (read 120 frames)",
+      "type": "shell",
+      "command": "& '${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe' --camera-test --frames 120 | Out-Host",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "dependsOn": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "self-test",
+      "type": "shell",
+      "command": "Start-Process -Wait -FilePath '${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe' -ArgumentList '--selftest','--selftest-out','${workspaceFolder}/selftest.txt'; Get-Content '${workspaceFolder}/selftest.txt'",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "dependsOn": "build",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+
+# IDE / tooling
+.vs/
+.idea/
+*.user
+*.suo
+*.rsuser
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Self-test report written by the VS Code task
+selftest.txt
+
+# Native / installer build output
+x64/
+Debug/
+Release/
+*.msi
+*.wixpdb
+*.wixobj
+
+# Logs, local settings, crash dumps
+*.log
+*.dmp
+.claude/
+

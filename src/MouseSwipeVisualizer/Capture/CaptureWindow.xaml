@@ -1,0 +1,52 @@
+<!--
+    The OBS capture target. Deliberately a plain top-level window:
+    - WindowStyle=SingleBorderWindow, AllowsTransparency=False -> no WS_EX_LAYERED / WS_EX_TRANSPARENT
+    - ShowInTaskbar=True, no Owner                             -> no WS_EX_TOOLWINDOW, listed by OBS
+    - Topmost=False                                            -> may sit behind the game / on another monitor
+    - ResizeMode=NoResize                                      -> client area = exact capture size, no minimize button
+    The client area contains nothing but the background and the swipe canvas.
+    Title: always "Mouse Swipe Visualizer" (CaptureWindow.CaptureTitle); stable, so OBS finds it in OBS mode.
+-->
+<Window x:Class="MouseSwipeVisualizer.Capture.CaptureWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="SingleBorderWindow"
+        AllowsTransparency="False"
+        ResizeMode="NoResize"
+        ShowInTaskbar="True"
+        Topmost="False"
+        ShowActivated="True"
+        SizeToContent="Manual"
+        WindowStartupLocation="Manual"
+        Width="820" Height="840"
+        Background="#00FF00">
+    <Window.ContextMenu>
+        <!-- A context menu is a separate popup HWND: OBS Window Capture of this window does not include it. -->
+        <ContextMenu>
+            <MenuItem Header="Settings…" Click="SettingsMenuItem_Click" />
+            <MenuItem Header="Clear trail" Click="ClearMenuItem_Click" />
+            <Separator />
+            <MenuItem Header="Exit" Click="ExitMenuItem_Click" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <!-- Surface is sized in capture pixels; the Viewbox scales it to the client area, which the
+         controller sizes to exactly CaptureWidth x CaptureHeight physical pixels at any DPI. -->
+    <Viewbox Stretch="Uniform">
+        <Grid x:Name="Surface" Width="800" Height="800" ClipToBounds="True" UseLayoutRounding="False" Background="#00FF00">
+            <!-- Frames come from the window-independent SwipeEngine (same pixels the virtual camera gets). -->
+            <Image x:Name="FrameImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+            <!-- Only visible with IncludeDebugInCapture=true (development aid, off by default). -->
+            <Border x:Name="DebugPanel"
+                    Background="#E0000000"
+                    Padding="8,6"
+                    Margin="8"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Bottom"
+                    IsHitTestVisible="False"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="DebugText" FontFamily="Consolas" FontSize="13" Foreground="White" />
+            </Border>
+        </Grid>
+    </Viewbox>
+</Window>

@@ -1,0 +1,329 @@
+<Window x:Class="MouseSwipeVisualizer.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mouse Swipe Visualizer – Settings"
+        Width="600" SizeToContent="Height"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True">
+    <Window.Resources>
+        <Style TargetType="TextBlock" x:Key="Label">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,5" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,3,0,3" />
+            <Setter Property="Padding" Value="3,2" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,4,16,4" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+    </Window.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16">
+        <GroupBox Header="Output" Padding="8,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+                <TextBlock Style="{StaticResource Label}" Text="Output mode" />
+                <ComboBox x:Name="OutputModeCombo" Grid.Column="1" Margin="0,3"
+                          ToolTip="Native Virtual Camera: 'Mouse Swipe Visualizer Camera' for Medal / camera apps. OBS Capture Window: v2 fallback." />
+                <CheckBox x:Name="ShowPreviewCheck" Grid.Row="1" Grid.ColumnSpan="2" Content="Show preview window at start-up (the camera works without it)" />
+                <TextBlock x:Name="CameraSummaryText" Grid.Row="2" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="0,4,0,4" />
+                <WrapPanel Grid.Row="3" Grid.ColumnSpan="2">
+                    <Button x:Name="CameraInstallButton" Content="Install / repair camera (admin)" Margin="0,0,6,4" />
+                    <Button x:Name="CameraRemoveButton" Content="Remove camera" Margin="0,0,6,4" />
+                    <Button x:Name="CameraTestButton" Content="Test camera" Margin="0,0,6,4" />
+                    <Button x:Name="PreviewButton" Content="Show preview" Margin="0,0,6,4" />
+                </WrapPanel>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Capture canvas / OBS capture window" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Style="{StaticResource Label}" Text="Capture size (px)" />
+                <ComboBox x:Name="CaptureSizeCombo" Grid.Column="1" Margin="0,3" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBox x:Name="CaptureWidthBox" Width="60" ToolTip="Width in physical pixels (what OBS receives)" />
+                    <TextBlock Text="×" VerticalAlignment="Center" Margin="6,0,0,0" />
+                    <TextBox x:Name="CaptureHeightBox" Width="60" ToolTip="Height in physical pixels" />
+                </StackPanel>
+
+                <CheckBox x:Name="BackgroundCheck" Grid.Row="1" Grid.ColumnSpan="2" Content="Chroma-key background"
+                          ToolTip="On: solid key colour for OBS Chroma Key. Off: black background for OBS blending mode 'Screen'." />
+                <TextBox x:Name="ChromaColorBox" Grid.Row="1" Grid.Column="2" ToolTip="Key colour, default #00FF00" />
+
+                <CheckBox x:Name="ChromaSafeCheck" Grid.Row="2" Grid.ColumnSpan="3" Content="Chroma-safe edges (no green halo after keying)"
+                          ToolTip="Opaque colour fade and hard-edged outer outline, so no trail pixel is blended with the key colour." />
+
+                <CheckBox x:Name="DebugInCaptureCheck" Grid.Row="3" Grid.ColumnSpan="3" Content="Include debug info in capture (development only – shows up in clips)" />
+
+                <CheckBox x:Name="SettingsOnStartupCheck" Grid.Row="4" Grid.ColumnSpan="3" Content="Open this settings window at start-up" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Swipe" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Style="{StaticResource Label}" Text="Sensitivity scale" />
+                <Slider x:Name="SensitivitySlider" Grid.Column="1" SmallChange="0.01" LargeChange="0.1"
+                        ToolTip="How far a mouse movement travels in the visualizer (logarithmic)." />
+                <TextBox x:Name="SensitivityBox" Grid.Column="2" />
+
+                <WrapPanel x:Name="SensitivityPresets" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6" />
+
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Swipe break (ms)" />
+                <Slider x:Name="BreakSlider" Grid.Row="2" Grid.Column="1" Minimum="10" Maximum="1000" SmallChange="5" LargeChange="20"
+                        ToolTip="Pause without movement after which the next movement starts a new swipe at the centre." />
+                <TextBox x:Name="BreakBox" Grid.Row="2" Grid.Column="2" />
+
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Smoothing" />
+                <Slider x:Name="SmoothingSlider" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="1" SmallChange="0.01" LargeChange="0.1"
+                        ToolTip="Visual smoothing of the trail. 0 = raw input." />
+                <TextBox x:Name="SmoothingBox" Grid.Row="3" Grid.Column="2" />
+
+                <CheckBox x:Name="LiftCheck" Grid.Row="4" Content="Lift detection"
+                          ToolTip="Start a new swipe when the sensor cuts out abruptly mid-motion (mouse lifted to re-center), even before the swipe break time." />
+                <Slider x:Name="LiftGapSlider" Grid.Row="4" Grid.Column="1" Minimum="15" Maximum="200" SmallChange="1" LargeChange="10"
+                        ToolTip="Minimum silence (ms) after an abrupt stop that counts as a lift." />
+                <TextBox x:Name="LiftGapBox" Grid.Row="4" Grid.Column="2" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Trail (line, head, dot)" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Style="{StaticResource Label}" Text="Trail lifetime (ms)" />
+                <Slider x:Name="LifetimeSlider" Grid.Column="1" Minimum="50" Maximum="3000" SmallChange="10" LargeChange="100" />
+                <TextBox x:Name="LifetimeBox" Grid.Column="2" />
+
+                <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Line thickness (px)" />
+                <Slider x:Name="ThicknessSlider" Grid.Row="1" Grid.Column="1" Minimum="1" Maximum="32" SmallChange="0.5" LargeChange="1" />
+                <TextBox x:Name="ThicknessBox" Grid.Row="1" Grid.Column="2" />
+
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Line colour" />
+                <TextBox x:Name="TrailColorBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" ToolTip="#RRGGBB or a colour name" />
+
+                <CheckBox x:Name="OutlineCheck" Grid.Row="3" Content="Outline" />
+                <TextBox x:Name="OutlineColorBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" ToolTip="Outline colour around line, arrow and dot" />
+
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Head" />
+                <ComboBox x:Name="HeadStyleCombo" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Dot colour" />
+                <TextBox x:Name="DotColorBox" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Dot size (px)" />
+                <Slider x:Name="DotSizeSlider" Grid.Row="6" Grid.Column="1" Minimum="2" Maximum="48" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="DotSizeBox" Grid.Row="6" Grid.Column="2" />
+
+                <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Render FPS (max)" />
+                <Slider x:Name="FpsSlider" Grid.Row="7" Grid.Column="1" Minimum="20" Maximum="240" SmallChange="1" LargeChange="10" />
+                <TextBox x:Name="FpsBox" Grid.Row="7" Grid.Column="2" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Keyboard" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <CheckBox x:Name="KeyboardCheck" Grid.ColumnSpan="3" Content="Show keyboard (keys light up while pressed)" />
+
+                <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Position" />
+                <ComboBox x:Name="KeyboardPositionCombo" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Keyboard share (%)" />
+                <Slider x:Name="KeyboardSplitSlider" Grid.Row="2" Grid.Column="1" Minimum="20" Maximum="70" SmallChange="1" LargeChange="5"
+                        ToolTip="Share of the area used by the keyboard; the swipe gets the rest (default 40 / 60)." />
+                <TextBox x:Name="KeyboardSplitBox" Grid.Row="2" Grid.Column="2" />
+
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Key fill" />
+                <TextBox x:Name="KeyFillBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Key border" />
+                <TextBox x:Name="KeyBorderBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Key label" />
+                <TextBox x:Name="KeyLabelBox" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Pressed key fill" />
+                <TextBox x:Name="KeyPressedFillBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Pressed key label" />
+                <TextBox x:Name="KeyPressedLabelBox" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Mouse area frame (box around the swipe)" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <CheckBox x:Name="SwipeBoxCheck" Grid.ColumnSpan="3" Content="Show frame around the mouse area" />
+                <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Background" />
+                <TextBox x:Name="SwipeBoxFillBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Border colour" />
+                <TextBox x:Name="SwipeBoxBorderBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Border width" />
+                <Slider x:Name="SwipeBoxBorderWidthSlider" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="16" SmallChange="0.5" LargeChange="1" />
+                <TextBox x:Name="SwipeBoxBorderWidthBox" Grid.Row="3" Grid.Column="2" />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Corner radius" />
+                <Slider x:Name="SwipeBoxRadiusSlider" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="SwipeBoxRadiusBox" Grid.Row="4" Grid.Column="2" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Inner padding" />
+                <Slider x:Name="SwipeBoxPaddingSlider" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="SwipeBoxPaddingBox" Grid.Row="5" Grid.Column="2" />
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Width (%)" />
+                <Slider x:Name="SwipeBoxWidthSlider" Grid.Row="6" Grid.Column="1" Minimum="20" Maximum="100" SmallChange="1" LargeChange="5"
+                        ToolTip="Box width. The swipe keeps its size until the box edge reaches it." />
+                <TextBox x:Name="SwipeBoxWidthBox" Grid.Row="6" Grid.Column="2" />
+                <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Height (%)" />
+                <Slider x:Name="SwipeBoxHeightSlider" Grid.Row="7" Grid.Column="1" Minimum="20" Maximum="100" SmallChange="1" LargeChange="5"
+                        ToolTip="Box height. The swipe keeps its size until the box edge reaches it." />
+                <TextBox x:Name="SwipeBoxHeightBox" Grid.Row="7" Grid.Column="2" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Background image &amp; glass" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Style="{StaticResource Label}" Text="Background image" />
+                <DockPanel Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3">
+                    <Button x:Name="BgImageClearButton" DockPanel.Dock="Right" Content="Clear" Padding="8,1" Margin="4,0,0,0" />
+                    <Button x:Name="BgImageBrowseButton" DockPanel.Dock="Right" Content="Browse…" Padding="8,1" Margin="4,0,0,0" />
+                    <TextBox x:Name="BgImageBox" ToolTip="Picture behind everything (replaces the chroma key colour). Empty = none." />
+                </DockPanel>
+
+                <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Image blur" />
+                <Slider x:Name="BgBlurSlider" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" LargeChange="5" />
+                <TextBox x:Name="BgBlurBox" Grid.Row="1" Grid.Column="2" />
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Image dim (%)" />
+                <Slider x:Name="BgDimSlider" Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="90" SmallChange="1" LargeChange="5" />
+                <TextBox x:Name="BgDimBox" Grid.Row="2" Grid.Column="2" />
+
+                <CheckBox x:Name="GlassCheck" Grid.Row="3" Grid.ColumnSpan="3" Content="Glass look (frosted, see-through frame, mouse box and keys)" />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Glass tint" />
+                <TextBox x:Name="GlassTintBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Glass tint strength (%)" />
+                <Slider x:Name="GlassOpacitySlider" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="60" SmallChange="1" LargeChange="5" />
+                <TextBox x:Name="GlassOpacityBox" Grid.Row="5" Grid.Column="2" />
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Frost (extra blur)" />
+                <Slider x:Name="GlassBlurSlider" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" LargeChange="5" />
+                <TextBox x:Name="GlassBlurBox" Grid.Row="6" Grid.Column="2" />
+
+                <CheckBox x:Name="BordersCheck" Grid.Row="7" Grid.ColumnSpan="3" Content="Borders (frame, mouse box and keys)" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Frame (panel behind keyboard and swipe)" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <CheckBox x:Name="FrameCheck" Grid.ColumnSpan="3" Content="Show frame panel" />
+                <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Background" />
+                <TextBox x:Name="FrameBackgroundBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Border colour" />
+                <TextBox x:Name="FrameBorderBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Border width" />
+                <Slider x:Name="FrameBorderWidthSlider" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="16" SmallChange="0.5" LargeChange="1" />
+                <TextBox x:Name="FrameBorderWidthBox" Grid.Row="3" Grid.Column="2" />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Corner radius" />
+                <Slider x:Name="FrameRadiusSlider" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="FrameRadiusBox" Grid.Row="4" Grid.Column="2" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Margin" />
+                <Slider x:Name="FrameMarginSlider" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="FrameMarginBox" Grid.Row="5" Grid.Column="2" />
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Padding" />
+                <Slider x:Name="FramePaddingSlider" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="FramePaddingBox" Grid.Row="6" Grid.Column="2" />
+                <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Width (%)" />
+                <Slider x:Name="FrameWidthSlider" Grid.Row="7" Grid.Column="1" Minimum="20" Maximum="100" SmallChange="1" LargeChange="5"
+                        ToolTip="Panel width. Keyboard and swipe keep their size until the panel edge reaches them." />
+                <TextBox x:Name="FrameWidthBox" Grid.Row="7" Grid.Column="2" />
+                <TextBlock Grid.Row="8" Style="{StaticResource Label}" Text="Height (%)" />
+                <Slider x:Name="FrameHeightSlider" Grid.Row="8" Grid.Column="1" Minimum="20" Maximum="100" SmallChange="1" LargeChange="5"
+                        ToolTip="Panel height. Keyboard and swipe keep their size until the panel edge reaches them." />
+                <TextBox x:Name="FrameHeightBox" Grid.Row="8" Grid.Column="2" />
+            </Grid>
+        </GroupBox>
+        <GroupBox Header="Diagnostics (not captured by OBS)" Padding="8,4" Margin="0,10,0,0">
+            <TextBlock x:Name="DiagnosticsText" FontFamily="Consolas" FontSize="11.5" TextWrapping="Wrap" MinHeight="120" />
+        </GroupBox>
+
+        <DockPanel Margin="0,14,0,0" LastChildFill="False">
+            <Button x:Name="ResetButton" Content="Reset to defaults" />
+            <Button x:Name="ClearButton" Content="Clear trail" />
+            <Button x:Name="OpenFolderButton" Content="Open data folder" />
+            <Button x:Name="CloseButton" Content="Close" DockPanel.Dock="Right" Margin="0" IsDefault="True" />
+        </DockPanel>
+        <TextBlock x:Name="PathText" Margin="0,10,0,0" Foreground="Gray" FontSize="11" TextWrapping="Wrap" />
+    </StackPanel>
+    </ScrollViewer>
+</Window>

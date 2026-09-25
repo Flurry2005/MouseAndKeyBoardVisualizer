@@ -1,0 +1,17 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!--
+    Builds MouseSwipeVisualizer-<version>-x64.msi from the self-contained publish output.
+    Use installer\build-installer.ps1 (publishes first), or:
+      dotnet publish ..\src\MouseSwipeVisualizer -c Release -r win-x64 ... -o ..\publish\win-x64
+      dotnet build MouseSwipeVisualizer.Installer.wixproj -c Release
+  -->
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">3.0.7.0</ProductVersion>
+    <PublishDir Condition="'$(PublishDir)' == ''">$(MSBuildThisFileDirectory)..\publish\win-x64\</PublishDir>
+    <OutputName>MouseSwipeVisualizer-$(ProductVersion)-x64</OutputName>
+    <DefineConstants>ProductVersion=$(ProductVersion);PublishDir=$(PublishDir);RepoRoot=$(MSBuildThisFileDirectory)..\</DefineConstants>
+  </PropertyGroup>
+</Project>

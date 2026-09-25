@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <!-- The app is x64-only; publish with -r win-x64 (see README). -->
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <!-- Only used for the notification-area (tray) icon, which WPF does not provide. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MouseSwipeVisualizer</RootNamespace>
+    <AssemblyName>MouseSwipeVisualizer</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>3.0.7</Version>
+    <Product>Mouse Swipe Visualizer</Product>
+    <Description>Visualizes physical mouse swipes (Raw Input) as a native Windows virtual camera.</Description>
+    <!-- No InvariantGlobalization: WPF text input (TextBox) needs real culture data and throws without it. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Unsafe code is confined to Camera/CameraFrameLink.cs: lock-free seqlock writes into the shared
+         memory frame buffer need raw pointers and atomics on mapped memory. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- WFO0003 is a WinForms analyzer asking for Application.SetHighDpiMode. This is a WPF app:
+         WPF reads DPI awareness from app.manifest only, so the manifest entry is required. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF and WinForms share type names (Application, MessageBox, ...). Keep WinForms/Drawing
+         out of the implicit usings so every file is unambiguous; TrayIcon.cs imports them explicitly. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Frame transport layout shared with the native media source (SharedFrameProtocol.h). -->
+    <Compile Include="..\MouseSwipeVisualizer.Shared\SharedFrameProtocol.cs" Link="Camera\SharedFrameProtocol.cs" />
+  </ItemGroup>
+
+  <!-- ===================== native virtual camera (C++ Media Foundation media source) =====================
+       The native project needs Visual Studio's MSBuild (C++ toolset), which `dotnet build` does not
+       have. This target locates it with vswhere and builds the .vcxproj, so a plain
+       `dotnet build -c Release` builds everything. Set SkipNativeBuild=true to skip. -->
+  <PropertyGroup>
+    <NativeCameraProject>$(MSBuildThisFileDirectory)..\MouseSwipeVisualizer.VirtualCamera\MouseSwipeVisualizer.VirtualCamera.vcxproj</NativeCameraProject>
+    <NativeCameraConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</NativeCameraConfiguration>
+    <NativeCameraConfiguration Condition="'$(Configuration)' != 'Debug'">Release</NativeCameraConfiguration>
+    <NativeCameraDll>$(MSBuildThisFileDirectory)..\MouseSwipeVisualizer.VirtualCamera\bin\$(NativeCameraConfiguration)\MouseSwipeVisualizer.VirtualCamera.dll</NativeCameraDll>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeCamera" BeforeTargets="BeforeBuild" Condition="'$(SkipNativeBuild)' != 'true'">
+    <PropertyGroup>
+      <VsWhere>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</VsWhere>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(VsWhere)')" Text="vswhere.exe not found. Install Visual Studio 2022 with 'Desktop development with C++' and the Windows 11 SDK, or build with -p:SkipNativeBuild=true (no virtual camera)." />
+    <Exec Command="&quot;$(VsWhere)&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find MSBuild\**\Bin\amd64\MSBuild.exe" ConsoleToMSBuild="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="VsMSBuildRaw" />
+    </Exec>
+    <PropertyGroup>
+      <VsMSBuild>$([System.String]::Copy('$(VsMSBuildRaw)').Split(';')[0].Trim())</VsMSBuild>
+    </PropertyGroup>
+    <Error Condition="'$(VsMSBuild)' == '' or !Exists('$(VsMSBuild)')" Text="Visual Studio MSBuild with the C++ toolset (v143) was not found." />
+    <Exec Command="&quot;$(VsMSBuild)&quot; &quot;$(NativeCameraProject)&quot; -nologo -verbosity:minimal -p:Configuration=$(NativeCameraConfiguration) -p:Platform=x64" />
+  </Target>
+
+  <ItemGroup Condition="'$(SkipNativeBuild)' != 'true'">
+    <!-- Kept out of the single-file bundle: the installer copies this file to Program Files for the Frame Server. -->
+    <Content Include="$(NativeCameraDll)" Link="MouseSwipeVisualizer.VirtualCamera.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+</Project>

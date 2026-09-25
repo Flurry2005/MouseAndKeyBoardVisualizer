@@ -1,0 +1,15 @@
+EXPORTS
+    DllGetClassObject               PRIVATE
+    DllCanUnloadNow                 PRIVATE
+    DllRegisterServer               PRIVATE
+    DllUnregisterServer             PRIVATE
+    MsvCam_QueryApiSupport
+    MsvCam_GetRegisteredServerPath
+    MsvCam_CreateCamera
+    MsvCam_RemoveCamera
+    MsvCam_RemoveAllDevnodes
+    MsvCam_EnumerateCameras
+    MsvCam_ConsumerOpen
+    MsvCam_ConsumerOpenInProc
+    MsvCam_ConsumerRead
+    MsvCam_ConsumerClose

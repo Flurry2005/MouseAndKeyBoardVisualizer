@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Mouse Swipe Visualizer",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Mouse Swipe Visualizer (headless / tray only)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe",
+      "args": ["--headless"],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Self-test (listen 10 s for mouse input)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/MouseSwipeVisualizer/bin/Debug/net9.0-windows/MouseSwipeVisualizer.exe",
+      "args": ["--selftest", "--selftest-out", "${workspaceFolder}/selftest.txt", "--selftest-input-seconds", "10"],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}
