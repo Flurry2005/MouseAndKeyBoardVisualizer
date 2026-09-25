@@ -1439,7 +1439,7 @@ public static class SelfTest
         string cover = WriteQuadrantImage(dir);
         const int w = 1280, h = 720;
         var builder = new SwipeModelBuilder();
-        builder.Configure(new AppSettings());
+        builder.Configure(new AppSettings { BackgroundFadeMs = 0 }); // override itself; the fade is tested below
         var tracker = new SwipeTracker();
         var model = new SwipeRenderModel();
         var raster = new SoftwareRasterizer();
@@ -1457,6 +1457,41 @@ public static class SelfTest
         uint after = FramePixel();
         r.Check("cover override shows in the frame, then back to the frame colour",
             (plain & 0xFFFFFFu) == 0 && Brightness(withCover) > 90 && (after & 0xFFFFFFu) == 0, true, $"0x{plain:X8} 0x{withCover:X8} 0x{after:X8}");
+
+        // 6) Crossfade when the cover changes: old → blend → new, then idle again; 0 ms = instant.
+        long t0 = MonotonicClock.Now;
+        uint RenderAt(SwipeModelBuilder b, SoftwareRasterizer rs, double ms)
+        {
+            b.Build(tracker, w, h, t0 + MonotonicClock.MsToTicks(ms), model);
+            rs.Render(model);
+            return rs.Pixels[12 * w + 100];
+        }
+
+        var fadeBuilder = new SwipeModelBuilder();
+        fadeBuilder.Configure(new AppSettings { BackgroundFadeMs = 600 });
+        var fadeRaster = new SoftwareRasterizer();
+        fadeBuilder.SetImageOverride(cover);
+        uint coverPx = RenderAt(fadeBuilder, fadeRaster, 0);
+        r.Check("first picture appears without a fade (nothing to fade from yet)", fadeRaster.IsAnimating, false);
+        fadeBuilder.SetImageOverride(null);
+        uint start = RenderAt(fadeBuilder, fadeRaster, 1000);
+        bool runningAtStart = fadeRaster.IsAnimating;
+        uint mid = RenderAt(fadeBuilder, fadeRaster, 1300);
+        bool runningMid = fadeRaster.IsAnimating;
+        uint end = RenderAt(fadeBuilder, fadeRaster, 1700);
+        r.Line($"    fade 600 ms: cover 0x{coverPx:X8}, start 0x{start:X8}, 300 ms 0x{mid:X8}, 700 ms 0x{end:X8}");
+        r.Check("cover change starts a crossfade from the old cover", runningAtStart && start == coverPx, true);
+        r.Check("halfway: a blend of old and new", runningMid && Brightness(mid) < Brightness(coverPx) && Brightness(mid) > 0, true);
+        r.Check("after the fade time: the new picture, fade finished", !fadeRaster.IsAnimating && (end & 0xFFFFFFu) == 0, true);
+
+        var instantBuilder = new SwipeModelBuilder();
+        instantBuilder.Configure(new AppSettings { BackgroundFadeMs = 0 });
+        var instantRaster = new SoftwareRasterizer();
+        instantBuilder.SetImageOverride(cover);
+        RenderAt(instantBuilder, instantRaster, 0);
+        instantBuilder.SetImageOverride(null);
+        uint instant = RenderAt(instantBuilder, instantRaster, 1000);
+        r.Check("fade 0 ms: switches instantly", !instantRaster.IsAnimating && (instant & 0xFFFFFFu) == 0, true);
 
         var service = new Spotify.SpotifyService(dir);
         r.Check("service without credentials: not connected", service.IsConnected || service.HasSavedSecret, false);

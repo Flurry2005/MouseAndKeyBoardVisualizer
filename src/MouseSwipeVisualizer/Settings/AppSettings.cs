@@ -87,6 +87,7 @@ public sealed class AppSettings
     public const double MinSwipeBoxPercent = 20, MaxSwipeBoxPercent = 100;
     public const double MinSpotifyPollSeconds = 1, MaxSpotifyPollSeconds = 60, DefaultSpotifyPollSeconds = 3;
     public const int DefaultSpotifyPort = 8888;
+    public const double MaxBackgroundFadeMs = 5000, DefaultBackgroundFadeMs = 600;
     public const double MaxImageBlur = 100, MaxImageDim = 90, MaxGlassOpacity = 60, MaxGlassBlur = 100;
     public const double MaxFrameBorder = 16, MaxFrameRadius = 80, MaxFrameMargin = 80, MaxFramePadding = 80;
     public const string DefaultChromaKeyColor = "#00FF00";
@@ -240,6 +241,9 @@ public sealed class AppSettings
     /// <summary>Extra blur behind the glass (px), on top of <see cref="BackgroundImageBlur"/>.</summary>
     public double GlassBlur { get; set; } = 16;
 
+    /// <summary>Crossfade (ms) when the picture changes, e.g. a new Spotify cover. 0 = switch instantly.</summary>
+    public double BackgroundFadeMs { get; set; } = DefaultBackgroundFadeMs;
+
     /// <summary>Borders on frame, mouse box and keys.</summary>
     public bool BordersEnabled { get; set; } = true;
 
@@ -340,6 +344,7 @@ public sealed class AppSettings
         SwipeBoxPadding = Clamp(nameof(SwipeBoxPadding), SwipeBoxPadding, 0, MaxFramePadding, 10, fixes);
         BackgroundImagePath = BackgroundImagePath?.Trim().Trim('"') ?? string.Empty;
         SpotifyClientId = SpotifyClientId?.Trim() ?? string.Empty;
+        BackgroundFadeMs = Clamp(nameof(BackgroundFadeMs), BackgroundFadeMs, 0, MaxBackgroundFadeMs, DefaultBackgroundFadeMs, fixes);
         SpotifyPollSeconds = Clamp(nameof(SpotifyPollSeconds), SpotifyPollSeconds, MinSpotifyPollSeconds, MaxSpotifyPollSeconds, DefaultSpotifyPollSeconds, fixes);
         if (SpotifyRedirectPort is < 1024 or > 65535)
         {

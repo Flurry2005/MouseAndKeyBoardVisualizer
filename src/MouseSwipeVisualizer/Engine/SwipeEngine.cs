@@ -224,7 +224,8 @@ public sealed class SwipeEngine : IDisposable
         bool empty = _model.IsEmpty;
         bool sameSize = width == _lastWidth && height == _lastHeight;
         long keyboardVersion = Keyboard?.Version ?? 0;
-        bool rasterize = _forceRaster || !sameSize || !(empty && _lastFrameEmpty) || keyboardVersion != _lastKeyboardVersion;
+        bool rasterize = _forceRaster || !sameSize || !(empty && _lastFrameEmpty) || keyboardVersion != _lastKeyboardVersion
+                         || _rasterizer.IsAnimating;
         if (rasterize)
         {
             _rasterizer.Render(_model);
@@ -263,7 +264,7 @@ public sealed class SwipeEngine : IDisposable
             MonotonicClock.TicksToMs(end - start),
             GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
 
-        if (empty && _buffer.TryEnterIdle())
+        if (empty && !_rasterizer.IsAnimating && _buffer.TryEnterIdle())
         {
             // Nothing visible: sleep until the next mouse delta (or the output heartbeat interval).
             WaitIdle();

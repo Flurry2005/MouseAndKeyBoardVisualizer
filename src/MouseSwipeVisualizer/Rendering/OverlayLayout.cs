@@ -58,7 +58,8 @@ public sealed record OverlayStyle(
     uint GlassTint = 0xFFFFFFFF,
     double GlassOpacity = 0.12,
     double GlassBlur = 0,
-    bool Borders = true)
+    bool Borders = true,
+    double ImageFadeMs = 0)
 {
     public static OverlayStyle From(AppSettings s)
     {
@@ -83,7 +84,7 @@ public sealed record OverlayStyle(
             s.FrameWidthPercent / 100.0, s.FrameHeightPercent / 100.0,
             s.BackgroundImagePath ?? string.Empty, s.BackgroundImageBlur, s.BackgroundImageDim / 100.0,
             s.GlassEnabled, Argb(s.GlassTintColor, System.Windows.Media.Colors.White), s.GlassOpacity / 100.0, s.GlassBlur,
-            s.BordersEnabled);
+            s.BordersEnabled, s.BackgroundFadeMs);
     }
 }
 

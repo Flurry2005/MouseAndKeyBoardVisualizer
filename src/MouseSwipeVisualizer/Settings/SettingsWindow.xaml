@@ -282,7 +282,7 @@
                     <ColumnDefinition Width="80" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
                 <CheckBox x:Name="SpotifyCheck" Grid.ColumnSpan="3" Content="Use the cover of what's playing on Spotify as the frame background" />
@@ -301,13 +301,17 @@
                 <Slider x:Name="SpotifyPollSlider" Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="60" SmallChange="1" LargeChange="5"
                         ToolTip="How often to check what is playing; the cover updates within this time after a song change." />
                 <TextBox x:Name="SpotifyPollBox" Grid.Row="5" Grid.Column="2" />
-                <StackPanel Grid.Row="6" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
+                <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Cover fade (ms)" />
+                <Slider x:Name="BgFadeSlider" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="5000" SmallChange="50" LargeChange="250"
+                        ToolTip="Crossfade when the cover (or background picture) changes. 0 = switch instantly." />
+                <TextBox x:Name="BgFadeBox" Grid.Row="6" Grid.Column="2" />
+                <StackPanel Grid.Row="7" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
                     <Button x:Name="SpotifyConnectButton" Content="Connect Spotify…" Padding="10,2" />
                     <Button x:Name="SpotifyDisconnectButton" Content="Disconnect" Padding="10,2" Margin="6,0,0,0"
                             ToolTip="Forget the saved client secret and sign-in" />
                 </StackPanel>
-                <TextBlock x:Name="SpotifyStatusText" Grid.Row="7" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" />
-                <TextBlock x:Name="SpotifySecretHint" Grid.Row="8" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.7" />
+                <TextBlock x:Name="SpotifyStatusText" Grid.Row="8" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" />
+                <TextBlock x:Name="SpotifySecretHint" Grid.Row="9" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.7" />
             </Grid>
         </GroupBox>
 

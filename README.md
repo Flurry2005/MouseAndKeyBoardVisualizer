@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.9.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.10.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -259,6 +259,7 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `SpotifyCoverEnabled` | false | Use the cover of what's playing on Spotify as the frame picture (see [Spotify cover art](#spotify-cover-art)). |
 | `SpotifyClientId` | empty | Client ID of your own Spotify app. The client secret is **not** stored in settings.json. |
 | `SpotifyPollSeconds` | 3 | How often to check what's playing (1–60 s); the cover changes within this time after a song change. |
+| `BackgroundFadeMs` | 600 | Crossfade (ms, 0–5000) when the cover or background picture changes; 0 = switch instantly. |
 | `SpotifyRedirectPort` | 8888 | Port of the local sign-in redirect `http://127.0.0.1:PORT/callback`. |
 | `BordersEnabled` | true | Borders on the frame, mouse area and keys (off = borderless). |
 | `FrameEnabled` | true | Draw the panel (the "frame") behind the keyboard and swipe. |
@@ -284,7 +285,8 @@ Setup (once):
 2. In the app's settings, copy the **Client ID** and click **View client secret** to copy the secret.
 3. In Mouse Swipe Visualizer, go to **Settings → Spotify cover art**. Paste both, click **Connect Spotify…** and
    approve access in the browser that opens.
-4. Tick **Use the cover of what's playing on Spotify** and choose how often to check (**Check every … s**, default 3).
+4. Tick **Use the cover of what's playing on Spotify** and choose how often to check (**Check every … s**, default 3)
+   and how long the crossfade to a new cover takes (**Cover fade (ms)**, default 600; 0 = instant).
 
 Apps in Spotify's development mode only work for their owner and for users you add under *User Management* in the
 dashboard.

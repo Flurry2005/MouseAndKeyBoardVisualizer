@@ -14,7 +14,7 @@
     <RootNamespace>MouseSwipeVisualizer</RootNamespace>
     <AssemblyName>MouseSwipeVisualizer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>3.0.9</Version>
+    <Version>3.0.10</Version>
     <!-- Release binaries carry no local build paths. -->
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildProjectDirectory)=/_/src/MouseSwipeVisualizer</PathMap>

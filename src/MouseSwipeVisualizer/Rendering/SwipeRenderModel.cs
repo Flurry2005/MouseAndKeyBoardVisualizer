@@ -52,6 +52,9 @@ public sealed class SwipeRenderModel
 
     public int Width { get; set; }
 
+    /// <summary>Frame time (<see cref="Utilities.MonotonicClock"/> ticks); drives the picture crossfade.</summary>
+    public long Now { get; set; }
+
     public int Height { get; set; }
 
     /// <summary>Trail width at full opacity, in canvas pixels.</summary>

@@ -149,6 +149,7 @@ public sealed class SwipeModelBuilder
         model.DotColor = _dotColor;
         model.Style = _style;
         model.StyleVersion = _styleVersion;
+        model.Now = now;
         OverlayLayout layout = OverlayLayout.Compute(Math.Max(width, 0), Math.Max(height, 0), _style);
         model.Layout = layout;
         model.KeyboardVersion = keyboard?.Version ?? 0;

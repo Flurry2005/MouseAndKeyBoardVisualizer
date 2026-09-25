@@ -425,6 +425,8 @@ public partial class SettingsWindow : Window
         BindCheck(SpotifyCheck, () => _host.Settings.SpotifyCoverEnabled, v => _host.Settings.SpotifyCoverEnabled = v);
         BindSlider(SpotifyPollSlider, SpotifyPollBox, () => _host.Settings.SpotifyPollSeconds, v => _host.Settings.SpotifyPollSeconds = v,
             AppSettings.MinSpotifyPollSeconds, AppSettings.MaxSpotifyPollSeconds, "0");
+        BindSlider(BgFadeSlider, BgFadeBox, () => _host.Settings.BackgroundFadeMs, v => _host.Settings.BackgroundFadeMs = v,
+            0, AppSettings.MaxBackgroundFadeMs, "0");
 
         void CommitClientId()
         {

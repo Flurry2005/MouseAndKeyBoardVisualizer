@@ -77,6 +77,14 @@ public sealed class SoftwareRasterizer
     private string? _imageFailure;
     private uint _glassTint = 0xFFFFFFFFu;
 
+    // Crossfade between pictures (new Spotify cover): the previous static layer blends into the new one.
+    private uint[] _fadeFrom = Array.Empty<uint>();
+    private string? _imageIdentity;
+    private bool _fading;
+    private long _fadeStart;
+    private long _fadeTicks;
+    private double _fadeT;
+
     public int Width => _width;
 
     public int Height => _height;
@@ -86,6 +94,9 @@ public sealed class SoftwareRasterizer
 
     /// <summary>Pixels whose colour was computed from shapes in the last frame (diagnostics).</summary>
     public int LastShadedPixels { get; private set; }
+
+    /// <summary>True while the picture crossfade runs: the caller must keep rendering frames until it ends.</summary>
+    public bool IsAnimating => _fading;
 
     /// <summary>How often the background + frame layer was rebuilt (diagnostics; style/size changes only).</summary>
     public int BaseLayerBuilds { get; private set; }
@@ -98,7 +109,7 @@ public sealed class SoftwareRasterizer
         EnsureSize(model.Width, model.Height);
         _chromaSafe = model.ChromaSafe;
         PrepareStaticLayer(model);
-        _static.AsSpan(0, _width * _height).CopyTo(_frame);
+        ComposeStatic(model.Now);
         _hardEdges = _chromaSafe && !_imageFillsCanvas && model.Style is not ({ FrameEnabled: true } or { SwipeBoxEnabled: true });
         LastShadedPixels = 0;
         if (model.IsEmpty || _width == 0 || _height == 0)
@@ -179,6 +190,7 @@ public sealed class SoftwareRasterizer
             Array.Clear(_outCov);
             Array.Clear(_outA);
             Array.Clear(_coreColor);
+            _fading = false; // a crossfade never survives a size change
         }
 
         _width = width;
@@ -400,11 +412,22 @@ public sealed class SoftwareRasterizer
         if (baseKey != _baseKey)
         {
             int n = _width * _height;
+            bool hadFrame = _staticKey.W == _width && _staticKey.H == _height; // something is on screen to fade from
             // The picture fills the frame panel (replacing its colour); without a frame, the whole image.
             bool framed = style is { FrameEnabled: true } && !model.Layout.Frame.IsEmpty;
             RectD imageArea = framed ? model.Layout.Frame : new RectD(0, 0, _width, _height);
             _imageActive = style != null && UpdateImage(style, imageArea);
             _imageFillsCanvas = _imageActive && !framed;
+            string identity = _imageActive ? _imageKey.Path : string.Empty;
+            if (identity != _imageIdentity)
+            {
+                if (hadFrame && _imageIdentity != null && style is { ImageFadeMs: > 0 })
+                {
+                    StartFade(model.Now, style.ImageFadeMs);
+                }
+
+                _imageIdentity = identity;
+            }
             _edgeSafe = _chromaSafe && !_imageFillsCanvas; // no key colour left: nothing to protect
             _glassTint = (style?.GlassTint ?? 0xFFFFFFFFu) | 0xFF000000u;
             if (_imageFillsCanvas)
@@ -451,6 +474,70 @@ public sealed class SoftwareRasterizer
 
         _staticKey = staticKey;
         KeyboardLayerBuilds++;
+    }
+
+    /// <summary>Remembers what is on screen now (mid-fade: the current blend) as the start of a new crossfade.</summary>
+    private void StartFade(long now, double ms)
+    {
+        int n = _width * _height;
+        if (_fadeFrom.Length < n)
+        {
+            _fadeFrom = new uint[n];
+        }
+
+        if (_fading)
+        {
+            BlendInto(_fadeFrom, _fadeT);
+        }
+        else
+        {
+            _static.AsSpan(0, n).CopyTo(_fadeFrom);
+        }
+
+        _fading = true;
+        _fadeStart = now;
+        _fadeTicks = Math.Max(1, Utilities.MonotonicClock.MsToTicks(ms));
+        _fadeT = 0;
+    }
+
+    /// <summary>Static layer into the frame; during a crossfade blended from the previous picture (smoothstep).</summary>
+    private void ComposeStatic(long now)
+    {
+        int n = _width * _height;
+        if (_fading)
+        {
+            double linear = Math.Clamp((double)(now - _fadeStart) / _fadeTicks, 0, 1);
+            if (linear < 1)
+            {
+                _fadeT = linear * linear * (3 - 2 * linear);
+                BlendInto(_frame, _fadeT);
+                return;
+            }
+
+            _fading = false;
+        }
+
+        _static.AsSpan(0, n).CopyTo(_frame);
+    }
+
+    private void BlendInto(uint[] target, double t)
+    {
+        int n = _width * _height;
+        uint a = (uint)Math.Clamp(Math.Round(t * 256), 0, 256), ia = 256 - a;
+        uint[] from = _fadeFrom, to = _static;
+        for (int i = 0; i < n; i++)
+        {
+            uint p = from[i], q = to[i];
+            if (p == q)
+            {
+                target[i] = q;
+                continue;
+            }
+
+            uint rb = ((((p & 0xFF00FFu) * ia) + ((q & 0xFF00FFu) * a)) >> 8) & 0xFF00FFu;
+            uint g = ((((p >> 8) & 0xFFu) * ia) + (((q >> 8) & 0xFFu) * a)) >> 8;
+            target[i] = 0xFF000000u | rb | (g << 8);
+        }
     }
 
     /// <summary>Glass tint strength for a layer (0 = solid colours); keys are tinted more than the panel.</summary>
