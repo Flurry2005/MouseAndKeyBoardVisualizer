@@ -1,20 +1,23 @@
 # Mouse Swipe Visualizer
 
-Visualiserar din **fysiska musrörelse** som korta, bleknande swipes och levererar bilden som en
-**riktig Windows-kamera**: **"Mouse Swipe Visualizer Camera"**. Medal (eller vilken kamera-app som helst)
-kan välja den direkt – ingen OBS behövs.
+Shows your **physical mouse movement** as short, fading swipes, together with a keyboard block that lights up
+the keys you hold, and delivers the picture as a **real Windows camera**: **"Mouse Swipe Visualizer Camera"**.
+Medal (or any other camera app) can select it directly; no OBS needed.
+
+**Download:** see [Releases](https://github.com/Flurry2005/MouseAndKeyBoardVisualizer/releases). There is an
+MSI installer, which registers the camera, and a portable zip.
 
 ```
-Windows Raw Input (WM_INPUT, RIDEV_INPUTSINK – även när spelet har fokus)
+Windows Raw Input (WM_INPUT, RIDEV_INPUTSINK, also while the game has focus)
         ↓
-RawMouseInput ─→ MouseDeltaBuffer
+RawMouseInput ─→ MouseDeltaBuffer                (+ KeyboardState for the keyboard panel)
         ↓
-SwipeEngine (egen tråd, egen timing)
+SwipeEngine (own thread, own timing)
    SwipeTracker → SwipeModelBuilder → SwipeRenderModel → SoftwareRasterizer (BGRA, off-screen)
         ↓                                                   ↘
-CameraFrameLink (delat minne Global\…, seqlock)              PreviewFrameStore → valfri preview-fönster
+CameraFrameLink (shared memory Global\…, seqlock)            PreviewFrameStore → optional preview window
         ↓
-MouseSwipeVisualizer.VirtualCamera.dll  (C++ Media Foundation media source, körs i Windows Camera Frame Server)
+MouseSwipeVisualizer.VirtualCamera.dll  (C++ Media Foundation media source, runs in the Windows Camera Frame Server)
    IMFMediaSourceEx / IMFMediaStream2 → BGRA→NV12/RGB32 → IMFSample
         ↓
 "Mouse Swipe Visualizer Camera" (MFCreateVirtualCamera, SoftwareCameraSource)
@@ -22,17 +25,18 @@ MouseSwipeVisualizer.VirtualCamera.dll  (C++ Media Foundation media source, kör
 Medal → Settings → Video Overlays → Virtual Camera Capture
 ```
 
-**Videon är oberoende av fönster.** Renderingen sker i en egen tråd till en minnesbuffert – inget
-WPF-fönster, ingen skärmdump, ingen `PrintWindow`. Kameran fungerar lika bra när Settings/preview är
-täckt, minimerat, dolt, stängt, eller när appen bara kör i tray (`--headless`).
+**The video does not depend on any window.** Rendering happens on its own thread into a memory buffer: no WPF
+window, no screenshot, no `PrintWindow`. The camera works just the same when Settings or the preview is covered,
+minimized, hidden or closed, or when the app runs in the tray only (`--headless`).
 
-**Tangentbord + ram.** Bilden delas 40/60: till vänster ett tangentbordsblock (Esc–5, Tab–T, Caps–G,
-Shift–B, Ctrl/Alt/Space) där nedtryckta tangenter lyser upp, till höger swipen i en egen ram (musytan). Allt ligger på en
-stylad panel ("frame") med bakgrund, kantfärg, kantbredd och rundade hörn. Allt är inställbart
-(se [Settings](#settings)); tangentbord och ram kan stängas av för ren swipe över hela bilden.
+**Keyboard and frames.** By default the picture is split 40/60. On the left is a keyboard block (Esc–5, Tab–T,
+Caps–G, Shift–B, Ctrl/Alt/Space) where held keys light up. On the right is the swipe in its own box (the mouse
+area). Everything sits on a styled panel (the "frame") with a background, border colour, border width and rounded
+corners. A background picture can fill the frame, with an optional frosted-glass look. Everything is configurable
+(see [Settings](#settings)). The keyboard and frames can be turned off for a plain full-picture swipe.
 
-Programmet **observerar** bara input – det injicerar, ändrar eller blockerar ingenting och rör inte spelprocessen.
-Kameran är en **user-mode** Media Foundation media source (ingen kernel-drivrutin).
+The program only **observes** input. It does not inject, change or block anything and never touches the game
+process. The camera is a **user-mode** Media Foundation media source (no kernel driver).
 
 ---
 
@@ -40,10 +44,10 @@ Kameran är en **user-mode** Media Foundation media source (ingen kernel-drivrut
 
 | | |
 |---|---|
-| OS | **Windows 11 build 22000 eller senare** för den virtuella kameran (utvecklat/testat på build 26200). Appen startar även på Windows 10, men utan kamera (Settings visar då *"Native Windows Virtual Camera is not supported on this Windows version. Requires Windows 11 build 22000 or later."*). |
-| Köra (MSI) | Inget extra – self-contained .NET, statiskt länkad C++-runtime (ingen VC++ redistributable behövs). |
-| Bygga | .NET SDK 9.0 + **Visual Studio 2022** (Community räcker) med workloads **.NET desktop development** och **Desktop development with C++** (toolset v143) + **Windows 11 SDK** (≥ 10.0.22000; projektet använder installerade **10.0.26100.0**). |
-| Installer | WiX v5 hämtas automatiskt via NuGet (`WixToolset.Sdk`). |
+| OS | **Windows 11 build 22000 or later** for the virtual camera (developed and tested on build 26200). The app also starts on Windows 10, but without the camera. Settings then shows *"Native Windows Virtual Camera is not supported on this Windows version. Requires Windows 11 build 22000 or later."* |
+| Running (MSI) | Nothing extra: self-contained .NET and a statically linked C++ runtime (no VC++ redistributable needed). |
+| Building | .NET SDK 9.0 + **Visual Studio 2022** (Community is fine) with the workloads **.NET desktop development** and **Desktop development with C++** (toolset v143) + **Windows 11 SDK** (≥ 10.0.22000; the project uses the installed **10.0.26100.0**). |
+| Installer | WiX v5 is fetched automatically through NuGet (`WixToolset.Sdk`). |
 
 ## Build
 
@@ -55,9 +59,9 @@ dotnet restore
 dotnet build -c Release
 ```
 
-`dotnet build` bygger även C++-projektet: `MouseSwipeVisualizer.csproj` hittar Visual Studios MSBuild via
-`vswhere` och bygger `MouseSwipeVisualizer.VirtualCamera.vcxproj`; DLL:en kopieras bredvid exe:n.
-(Utan C++-verktyg: `dotnet build -c Release -p:SkipNativeBuild=true` – då utan kamera.)
+`dotnet build` also builds the C++ project: `MouseSwipeVisualizer.csproj` finds Visual Studio's MSBuild through
+`vswhere` and builds `MouseSwipeVisualizer.VirtualCamera.vcxproj`, and the DLL is copied next to the exe.
+Without the C++ tools, use `dotnet build -c Release -p:SkipNativeBuild=true`; you then get no camera.
 
 MSI (publish + WiX):
 
@@ -67,218 +71,222 @@ powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 
 → `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.8.0-x64.msi`
 
-**VS Code:** öppna mappen, installera rekommenderade tillägg (C# Dev Kit). F5 = kör, *Run Task* har
-`build`, `build installer (MSI)`, `camera: status`, `camera: install / repair (UAC)`, `camera: test`, `self-test`.
-Launch-konfigurationen *headless / tray only* kör utan fönster.
+Release binaries are deterministic and contain no local build paths.
+
+**VS Code:** open the folder and install the recommended extensions (C# Dev Kit). F5 runs the app. *Run Task*
+offers `build`, `build installer (MSI)`, `camera: status`, `camera: install / repair (UAC)`, `camera: test` and
+`self-test`. The *headless / tray only* launch configuration runs without windows.
 
 ---
 
-## Installation och registrering av kameran
+## Installing and registering the camera
 
-### Rekommenderat: MSI
+### Recommended: MSI
 
-Dubbelklicka på MSI:n (UAC-fråga). Den:
+Double-click the MSI (UAC prompt). It:
 
-1. installerar `MouseSwipeVisualizer.exe` + `MouseSwipeVisualizer.VirtualCamera.dll` i `C:\Program Files\MouseSwipeVisualizer\`,
-2. COM-registrerar media source-DLL:en i **HKLM** (`CLSID {0728D89A-2065-4F45-85F7-B128DA227817}`, `ThreadingModel=Both`),
-3. skapar kameran för den installerande användaren (körs *utan* admin efter installationen).
+1. installs `MouseSwipeVisualizer.exe` + `MouseSwipeVisualizer.VirtualCamera.dll` into `C:\Program Files\MouseSwipeVisualizer\`,
+2. COM-registers the media source DLL in **HKLM** (`CLSID {0728D89A-2065-4F45-85F7-B128DA227817}`, `ThreadingModel=Both`),
+3. creates the camera for the installing user (this step runs *without* admin rights after the install).
 
-Avinstallation (Inställningar → Appar, eller `msiexec /x`) kör **före** filborttagningen en upphöjd åtgärd som tar
-bort **alla** kamera-enheter skapade från vår CLSID (alla användare), COM-registreringen och eventuella
-utvecklingskopior – inga föräldralösa kameror blir kvar (verifierat, se *Tester*). Uppgradering behåller kameran.
+Uninstalling (Settings → Apps, or `msiexec /x`) runs an elevated action **before** the files are removed. It
+deletes **all** camera devices created from our CLSID (for every user), the COM registration and any development
+copies, so no orphaned cameras are left behind (verified, see *Tests*). Upgrading keeps the camera.
 
-### Utvecklingsflöde: kommandon
+### Development workflow: commands
 
-| Kommando | Vad | Admin? |
+| Command | What it does | Admin? |
 |---|---|---|
-| `MouseSwipeVisualizer.exe --camera-status` | API-stöd, registrering, uppräkning, räknare | nej |
-| `MouseSwipeVisualizer.exe --camera-install` | kopierar DLL:en till Program Files + HKLM-COM (UAC), skapar sedan kameran | UAC för steg 1 |
-| `MouseSwipeVisualizer.exe --camera-register` | skapar/öppnar kameran för denna användare (idempotent) | nej |
-| `MouseSwipeVisualizer.exe --camera-unregister` | `IMFVirtualCamera::Remove` för denna användare | nej |
-| `MouseSwipeVisualizer.exe --camera-remove` | full borttagning: kamera(or), device nodes, COM, filer | UAC |
-| `MouseSwipeVisualizer.exe --camera-diagnose` | status + alla kameror + kort läs-test | nej |
-| `MouseSwipeVisualizer.exe --camera-test [--frames N] [--format 1280x720@30] [--rgb32] [--save-frame fil.png]` | öppnar kameran som Media Foundation-konsument och läser bilder | nej |
+| `MouseSwipeVisualizer.exe --camera-status` | API support, registration, enumeration, counters | no |
+| `MouseSwipeVisualizer.exe --camera-install` | copies the DLL to Program Files + HKLM COM (UAC), then creates the camera | UAC for step 1 |
+| `MouseSwipeVisualizer.exe --camera-register` | creates/opens the camera for this user (idempotent) | no |
+| `MouseSwipeVisualizer.exe --camera-unregister` | `IMFVirtualCamera::Remove` for this user | no |
+| `MouseSwipeVisualizer.exe --camera-remove` | full removal: camera(s), device nodes, COM, files | UAC |
+| `MouseSwipeVisualizer.exe --camera-diagnose` | status + all cameras + a short read test | no |
+| `MouseSwipeVisualizer.exe --camera-test [--frames N] [--format 1280x720@30] [--rgb32] [--save-frame file.png]` | opens the camera as a Media Foundation consumer and reads frames | no |
 
-Exe:n är en GUI-app; i PowerShell: `.\MouseSwipeVisualizer.exe --camera-status | Out-Host`.
-Samma funktioner finns som knappar i **Settings → Output**.
+The exe is a GUI app. In PowerShell, use `.\MouseSwipeVisualizer.exe --camera-status | Out-Host`.
+The same functions are available as buttons in **Settings → Output**.
 
-### Varför CurrentUser + System lifetime – och varför ändå admin?
+### Why CurrentUser + System lifetime, and why admin anyway?
 
-Två **olika** saker behöver sättas upp:
+Two **different** things have to be set up:
 
-* **Media source-DLL:en (COM)** laddas av tjänsterna *Windows Camera Frame Server* (LOCAL SERVICE) och
-  *Frame Server Monitor* (LOCAL SYSTEM) i session 0. De ser bara **HKLM**-registreringar och kan bara läsa filer
-  på en plats som t.ex. Program Files. Det kräver admin **en gång, vid installation**.
-* **Själva kameran** skapas med `MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
+* **The media source DLL (COM)** is loaded by the *Windows Camera Frame Server* (LOCAL SERVICE) and
+  *Frame Server Monitor* (LOCAL SYSTEM) services in session 0. They only see **HKLM** registrations and can only read
+  files from a location such as Program Files. That needs admin **once, at install time**.
+* **The camera itself** is created with `MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
   MFVirtualCameraLifetime_System, MFVirtualCameraAccess_CurrentUser, …)`:
-  * **`CurrentUser`**: kameran syns bara för ditt Windows-konto och kräver **ingen** admin (`AllUsers` gör det).
-  * **`System` lifetime**: kameran finns kvar mellan appstarter och omstarter, så Medal ser den även när appen
-    inte körs (då visas en ren chroma-bakgrund). Appen återskapar den dessutom idempotent vid varje start.
-    Avinstallationen tar alltid bort den (`IMFVirtualCamera::Remove` + borttagning av device nodes).
+  * **`CurrentUser`**: the camera is only visible to your Windows account and needs **no** admin (`AllUsers` would).
+  * **`System` lifetime**: the camera survives app restarts and reboots, so Medal sees it even when the app isn't
+    running (it then shows a plain chroma background). The app also re-creates it idempotently on every start.
+    Uninstalling always removes it (`IMFVirtualCamera::Remove` + removal of the device nodes).
 
-Windows lägger själv till *"Windows Virtual Camera"* i namnet – på svensk Windows heter kameran
-**"Mouse Swipe Visualizer Camera (Windows Virtuell Kamera)"**.
+Windows adds *"Windows Virtual Camera"* to the name itself, in your Windows language. On English Windows the
+camera is called **"Mouse Swipe Visualizer Camera (Windows Virtual Camera)"**.
 
 ---
 
-## Köra
+## Running
 
 ```bash
-MouseSwipeVisualizer.exe             # Settings + preview (preview kan stängas; kameran påverkas inte)
-MouseSwipeVisualizer.exe --headless  # bara tray-ikon, inga fönster – full kamerafunktion
+MouseSwipeVisualizer.exe             # Settings + preview (the preview can be closed; the camera is unaffected)
+MouseSwipeVisualizer.exe --headless  # tray icon only, no windows; the camera works fully
 ```
 
-Start-menyn har båda varianterna. Tray-ikonen: *Show preview*, *Settings…*, *Clear trail*, *Exit*.
+The Start menu has both variants. The tray icon offers *Show preview*, *Settings…*, *Clear trail* and *Exit*.
 
-### Rendera bara när någon tittar
+### Rendering only while someone is watching
 
-Media source skapar det delade minnet när en konsument (Medal) startar strömmen och uppdaterar en heartbeat per
-bild. Appen känner av det (polling 4 Hz utan konsument) och renderar **bara då** i konsumentens upplösning och
-FPS. Utan konsument: ingen 60 FPS-rendering (uppmätt **0,00 %** CPU). Oförändrad bild rasteriseras inte om –
-kameran upprepar senaste bilden med nya timestamps.
+The media source creates the shared memory when a consumer (Medal) starts the stream, and it updates a heartbeat
+for every frame. The app detects this (polling at 4 Hz while there is no consumer) and **only then** renders, at
+the consumer's resolution and frame rate. Without a consumer there is no 60 FPS rendering (measured **0.00 %** CPU).
+An unchanged picture is not rasterized again; the camera repeats the last frame with new timestamps.
 
 ---
 
 ## Video formats
 
-Kameran exponerar (första = standard):
+The camera exposes these formats (the first is the default):
 
-| Upplösning | FPS | Format |
+| Resolution | FPS | Format |
 |---|---|---|
-| **1280 × 720** | **30** (standard) | NV12, RGB32 |
+| **1280 × 720** | **30** (default) | NV12, RGB32 |
 | 1280 × 720 | 60 | NV12, RGB32 |
 | 800 × 800 | 60 | NV12, RGB32 |
 | 800 × 800 | 30 | NV12, RGB32 |
 | 640 × 480 | 30 | NV12, RGB32 |
 
-NV12 är vad kamerapipelinen och de flesta appar föredrar; RGB32 finns för appar som vill ha det. Bilden
-renderas direkt i den begärda upplösningen (swipe-ytan centreras i 16:9-bilden). Sensorprofilen *Legacy* är
-satt att visa alla format (även 60 FPS) för appar som inte är profil-medvetna.
+NV12 is what the camera pipeline and most apps prefer; RGB32 is there for apps that want it. The picture is
+rendered directly at the requested resolution. The sensor profile *Legacy* is set to show all formats (including
+60 FPS) for apps that aren't profile-aware.
 
 ---
 
-## IPC: app → kamera
+## IPC: app → camera
 
-* Namngivet delat minne **`Global\MouseSwipeVisualizerCamera.Frames.v1`** (24 MiB: 4 KiB header + 3 bildslottar à 8 MiB).
-  Media source (LOCAL SERVICE, session 0) skapar det med en DACL som ger *interaktiva användare* läs/skriv –
-  en vanlig användarprocess får inte skapa `Global\`-objekt. Layouten finns i
-  `src/MouseSwipeVisualizer.Shared/SharedFrameProtocol.h` (C++) och `.cs` (C#), byte-identiska.
-* **Ingen tearing:** trippelbuffring + **seqlock** per slot. Producenten skriver bara till en icke-publicerad slot
-  (seq udda → skriv → seq jämn → publicera slot-index). Konsumenten kopierar och godkänner bara om seq var jämn
-  och oförändrad före och efter kopian. Ingen mutex.
-* **Otillförlitlig data:** media source räknar själv ut offset/storlek och kräver exakt matchning
-  (`width/height` = begärd, `stride = width*4`, `offset = header + slot*kapacitet`, `size ≤ kapacitet`) – korrupt
-  metadata kan aldrig ge läsning utanför mappningen. Appen validerar på samma sätt det kameran skriver.
-* **App kör inte / har kraschat:** producer-heartbeat äldre än 1 s → kameran levererar en solid bakgrundsbild
-  (chroma-grön) i rätt takt. Appen återansluter automatiskt vid omstart.
-* **Konsumenten slutar:** consumer-heartbeat står still > 1 s → appen slutar producera.
+* Named shared memory **`Global\MouseSwipeVisualizerCamera.Frames.v1`** (24 MiB: a 4 KiB header + 3 frame slots of 8 MiB).
+  The media source (LOCAL SERVICE, session 0) creates it with a DACL that gives *interactive users* read/write
+  access, because a normal user process isn't allowed to create `Global\` objects. The layout is defined in
+  `src/MouseSwipeVisualizer.Shared/SharedFrameProtocol.h` (C++) and `.cs` (C#), byte for byte identical.
+* **No tearing:** triple buffering plus a **seqlock** per slot. The producer only writes to an unpublished slot
+  (seq odd → write → seq even → publish the slot index). The consumer copies and only accepts the copy if seq was
+  even and unchanged before and after the copy. No mutex.
+* **Untrusted data:** the media source computes offsets and sizes itself and requires an exact match
+  (`width/height` = requested, `stride = width*4`, `offset = header + slot*capacity`, `size ≤ capacity`), so corrupt
+  metadata can never cause a read outside the mapping. The app validates what the camera writes in the same way.
+* **App not running or crashed:** if the producer heartbeat is older than 1 s, or the app has exited cleanly, the
+  camera delivers a solid background frame (chroma green) at the right rate. The app reconnects automatically
+  when it restarts.
+* **Consumer stops:** if the consumer heartbeat stands still for more than 1 s, the app stops producing.
 
 ---
 
 ## Medal
 
-### Testplan (manuell – kräver Medal)
+### Test plan (manual, requires Medal)
 
-1. Installera MSI:n (eller `--camera-install`) och starta MouseSwipeVisualizer.
-2. Settings → **Output** ska visa *"Virtual camera: Ready – …"*; `--camera-status` ska visa
+1. Install the MSI (or run `--camera-install`) and start MouseSwipeVisualizer.
+2. Settings → **Output** should show *"Virtual camera: Ready – …"*; `--camera-status` should show
    `Virtual Camera: Registered   Status: Ready`.
-3. Starta Medal.
-4. Öppna **Settings → Video Overlays**.
-5. Slå på **Video Overlay**.
-6. Slå på **Virtual Camera Capture**.
-7. Leta efter **"Mouse Swipe Visualizer Camera (Windows Virtuell Kamera)"** (namnet kan få Windows-suffixet på annat språk).
-8. Välj kameran.
-9. Rör musen.
-10. Kontrollera Medals förhandsvisning – swipen ska synas (Settings → Diagnostics visar *Camera active consumer: YES*, begärt format och bildräknare).
-11. Starta ett spel.
-12. Skapa ett Medal-clip.
-13. Kontrollera att swipen finns i det färdiga clipet.
+3. Start Medal.
+4. Open **Settings → Video Overlays**.
+5. Turn on **Video Overlay**.
+6. Turn on **Virtual Camera Capture**.
+7. Look for **"Mouse Swipe Visualizer Camera (Windows Virtual Camera)"** (the suffix follows your Windows language).
+8. Select the camera.
+9. Move the mouse.
+10. Check Medal's preview; the swipe should be visible. Settings → Diagnostics shows *Camera active consumer: YES*,
+    the requested format and frame counters.
+11. Start a game.
+12. Create a Medal clip.
+13. Check that the swipe is in the finished clip.
 
-**Status:** Windows-sidan är verifierad (uppräkning, öppning, bildflöde genom Frame Server, se *Tester*).
-**Medal är inte verifierat** – det kräver att du går igenom stegen ovan. Resultatet dokumenteras här när testet är gjort.
+**Status:** the Windows side is verified (enumeration, opening, frame flow through the Frame Server; see *Tests*).
+**Medal itself is not verified.** That requires going through the steps above.
 
-### Viktig begränsning: transparens
+### Important limitation: transparency
 
-En kamerabild har ingen användbar alfakanal. Kameran levererar därför swipen på en **chroma-grön bakgrund**
-(`#00FF00`) med *chroma-safe edges* (inga halvtransparenta gröna kantpixlar, även efter NV12:s 2×2-chroma-
-subsampling). Medals dokumentation beskriver **ingen chroma key** för Video Overlay – anta därför att overlayn
-visas som en **ogenomskinlig ruta** med grön bakgrund i Medal. Det är en produktbegränsning i Medal, inte något
-vi kan lösa i kameran. Alternativ:
+A camera picture has no usable alpha channel. The camera therefore delivers the overlay on a **chroma-green
+background** (`#00FF00`) with *chroma-safe edges*: no half-transparent green edge pixels, even after NV12's 2×2
+chroma subsampling. Medal's documentation describes **no chroma key** for Video Overlay, so assume the overlay shows
+up in Medal as an **opaque box** with a green background. That is a limitation of Medal, not something the camera
+can solve. Alternatives:
 
-* Stäng av *Chroma-key background* i Settings → bakgrunden blir **svart** (diskretare ruta).
-* Behöver du genomskinlig swipe över spelet: använd **OBS-läget** (Output mode = *OBS Capture Window*) med
-  Chroma Key / Blending Mode *Screen* i OBS, se nedan.
+* Turn off *Chroma-key background* in Settings. The background becomes **black**, a more discreet box.
+* Use a background picture in the frame (see Settings), so the box looks intentional.
+* If you need a see-through swipe over the game, use **OBS mode** (Output mode = *OBS Capture Window*) with a
+  Chroma Key or the *Screen* blending mode in OBS; see below.
 
 ---
 
 ## Settings
 
-Sparas i `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; äldre filer läses in).
+Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older files are migrated).
 
-| Setting | Default | Beskrivning |
+| Setting | Default | Description |
 |---|---|---|
-| `OutputMode` | `NativeVirtualCamera` | `NativeVirtualCamera` eller `ObsCaptureWindow` (v2-fallback). |
-| `ShowPreview` | true | Visa preview-fönstret vid start. Kameran fungerar utan det. |
-| `CaptureWidth`/`CaptureHeight` | 800 × 800 | Previewns / OBS-fönstrets storlek. Kameran använder konsumentens begärda upplösning. |
-| `CaptureBackgroundEnabled` | true | Chroma-bakgrund (`ChromaKeyColor`), annars svart. Gäller kamera och preview. |
-| `ChromaKeyColor` | `#00FF00` | Bakgrundsfärg (även kamerans fallback-bild). |
-| `ChromaSafeEdges` | true | Opak färgramp-fade + hård, 2×2-blockjusterad kontur → ingen grön halo efter keying, även i NV12. |
-| `SensitivityScale` | 1.0 | 800 counts = mitt → kant vid 1.0. |
-| `SwipeBreakMs` | 120 | Paus som avslutar en swipe (nästa startar i mitten). |
-| `LiftDetectionEnabled` / `LiftGapMs` | true / 40 | Lyft-och-re-center-detektering. |
-| `SmoothingStrength` | 0.35 | Visuell utjämning. |
-| `TrailLifetimeMs` | 500 | Hur länge trailen syns. |
-| `TrailThickness` | 4 | Linjebredd i bildpixlar. |
-| `TrailColor` | `#FFFFFF` | Linjens färg. |
-| `OutlineEnabled` / `OutlineColor` | true / `#141418` | Kontur runt linje, pil och prick. |
-| `HeadStyle` | `Arrow` | Huvudet på swipen: `Arrow`, `Dot` eller `None`. |
-| `DotColor` / `DotSize` | `#FFFFFF` / 12 | Prickens färg och diameter (px, 2–48) när `HeadStyle` = `Dot`. |
-| `KeyboardEnabled` | true | Visa tangentbordsblocket. |
-| `KeyboardPosition` | `Left` | `Left`, `Right`, `Top` eller `Bottom` om swipen. |
-| `KeyboardSplitPercent` | 40 | Tangentbordets andel av ytan (20–70); swipen får resten (40/60). |
-| `KeyFillColor` / `KeyBorderColor` / `KeyLabelColor` | `#000000` / `#E6E6E6` / `#FFFFFF` | Tangent i vila. |
-| `KeyPressedFillColor` / `KeyPressedLabelColor` | `#FFFFFF` / `#000000` | Nedtryckt tangent. |
-| `SwipeBoxEnabled` | true | Ram runt musytan (swipen), i samma stil som tangenterna. |
-| `SwipeBoxFillColor` / `SwipeBoxBorderColor` | `#000000` / `#E6E6E6` | Musytans bakgrund och kant. |
-| `SwipeBoxBorderWidth` / `SwipeBoxCornerRadius` / `SwipeBoxPadding` | 2 / 12 / 10 | Kantbredd, hörnradie och luft mellan kant och swipe (px). |
-| `SwipeBoxWidthPercent` / `SwipeBoxHeightPercent` | 100 / 100 | Musramens bredd/höjd i % av sin yta (20–100, centrerad). Swipen behåller sin storlek och krymper först när ramkanten når den. |
-| `BackgroundImagePath` | tom | Bild i ramen: ersätter ramens och musytans bakgrundsfärg (skalas så att den täcker ramen; utanför ramen är det fortfarande chroma-färgen). Utan ram täcker den hela bilden. |
-| `BackgroundImageBlur` / `BackgroundImageDim` | 24 / 20 | Oskärpa (px) och mörkning (%) av bakgrundsbilden. |
-| `GlassEnabled` | false | Glaslook: ram, musyta och tangenter blir frostat, genomskinligt glas över (en extra suddig kopia av) bakgrundsbilden. Nedtryckta tangenter är solida. |
-| `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glasets ton, tonstyrka (%) och extra frost-oskärpa (px). |
-| `BordersEnabled` | true | Kanter på ram, musyta och tangenter (av = kantlöst). |
-| `FrameEnabled` | true | Rita panelen ("frame") bakom tangentbord och swipe. |
-| `FrameBackgroundColor` / `FrameBorderColor` | `#000000` / `#E6E6E6` | Panelens bakgrund och kant. |
-| `FrameBorderWidth` / `FrameCornerRadius` | 2 / 16 | Kantbredd och hörnradie (px). |
-| `FrameWidthPercent` / `FrameHeightPercent` | 100 / 100 | Panelens bredd/höjd i % av bilden (20–100, centrerad). Tangentbord och swipe behåller sin storlek och krymper först när panelkanten når dem. |
-| `FrameMargin` / `FramePadding` | 6 / 14 | Avstånd bildkant → panel, och panelkant → innehåll (px). |
-| `RenderFps` | 60 | Preview-FPS när ingen kamera-konsument styr takten. |
-| `IncludeDebugInCapture` | false | Debugtext i OBS-fönstret (utveckling). |
-| `ShowSettingsOnStartup` | true | Öppna Settings vid start. |
+| `OutputMode` | `NativeVirtualCamera` | `NativeVirtualCamera` or `ObsCaptureWindow` (fallback). |
+| `ShowPreview` | true | Show the preview window at start. The camera works without it. |
+| `CaptureWidth`/`CaptureHeight` | 800 × 800 | Size of the preview / OBS window. The camera uses the resolution the consumer requests. |
+| `CaptureBackgroundEnabled` | true | Chroma background (`ChromaKeyColor`), otherwise black. Applies to camera and preview. |
+| `ChromaKeyColor` | `#00FF00` | Background colour (also the camera's fallback picture). |
+| `ChromaSafeEdges` | true | Opaque colour-ramp fade + hard, 2×2-aligned edges wherever something touches the key colour, so there is no green halo after keying, even in NV12. |
+| `SensitivityScale` | 1.0 | 800 counts = centre → edge at 1.0. |
+| `SwipeBreakMs` | 120 | Pause that ends a swipe (the next one starts in the centre). |
+| `LiftDetectionEnabled` / `LiftGapMs` | true / 40 | Lift-and-re-centre detection. |
+| `SmoothingStrength` | 0.35 | Visual smoothing. |
+| `TrailLifetimeMs` | 500 | How long the trail stays visible. |
+| `TrailThickness` | 4 | Line width in picture pixels. |
+| `TrailColor` | `#FFFFFF` | Line colour. |
+| `OutlineEnabled` / `OutlineColor` | true / `#141418` | Outline around the line, arrow and dot. |
+| `HeadStyle` | `Arrow` | Head of the swipe: `Arrow`, `Dot` or `None`. |
+| `DotColor` / `DotSize` | `#FFFFFF` / 12 | Dot colour and diameter (px, 2–48) when `HeadStyle` = `Dot`. |
+| `KeyboardEnabled` | true | Show the keyboard block. |
+| `KeyboardPosition` | `Left` | `Left`, `Right`, `Top` or `Bottom` of the swipe. |
+| `KeyboardSplitPercent` | 40 | The keyboard's share of the area (20–70); the swipe gets the rest (40/60). |
+| `KeyFillColor` / `KeyBorderColor` / `KeyLabelColor` | `#000000` / `#E6E6E6` / `#FFFFFF` | Key at rest. |
+| `KeyPressedFillColor` / `KeyPressedLabelColor` | `#FFFFFF` / `#000000` | Pressed key. |
+| `SwipeBoxEnabled` | true | Frame around the mouse area (the swipe), styled like the keys. |
+| `SwipeBoxFillColor` / `SwipeBoxBorderColor` | `#000000` / `#E6E6E6` | Mouse area background and border. |
+| `SwipeBoxBorderWidth` / `SwipeBoxCornerRadius` / `SwipeBoxPadding` | 2 / 12 / 10 | Border width, corner radius and space between border and swipe (px). |
+| `SwipeBoxWidthPercent` / `SwipeBoxHeightPercent` | 100 / 100 | Mouse area frame width/height in % of its space (20–100, centred). The swipe keeps its size and only shrinks once the frame edge reaches it. |
+| `BackgroundImagePath` | empty | Picture inside the frame. It replaces the frame's and the mouse area's background colours and is scaled to cover the frame; outside the frame it's still the chroma colour. Without a frame it covers the whole picture. |
+| `BackgroundImageBlur` / `BackgroundImageDim` | 24 / 20 | Blur (px) and darkening (%) of the background picture. |
+| `GlassEnabled` | false | Glass look: the frame, mouse area and keys become frosted, see-through glass over an extra-blurred copy of the background picture. Pressed keys stay solid. |
+| `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glass tint, tint strength (%) and extra frost blur (px). |
+| `BordersEnabled` | true | Borders on the frame, mouse area and keys (off = borderless). |
+| `FrameEnabled` | true | Draw the panel (the "frame") behind the keyboard and swipe. |
+| `FrameBackgroundColor` / `FrameBorderColor` | `#000000` / `#E6E6E6` | Panel background and border. |
+| `FrameBorderWidth` / `FrameCornerRadius` | 2 / 16 | Border width and corner radius (px). |
+| `FrameWidthPercent` / `FrameHeightPercent` | 100 / 100 | Panel width/height in % of the picture (20–100, centred). The keyboard and swipe keep their size and only shrink once the panel edge reaches them. |
+| `FrameMargin` / `FramePadding` | 6 / 14 | Distance picture edge → panel, and panel border → content (px). |
+| `RenderFps` | 60 | Preview frame rate when no camera consumer sets the pace. |
+| `IncludeDebugInCapture` | false | Debug text in the OBS window (development). |
+| `ShowSettingsOnStartup` | true | Open Settings at start. |
 
-**Tangentbordet och integritet:** Raw Input för tangentbordet registreras bara när `KeyboardEnabled` är på.
-Endast upp/ner-läget för de 27 tangenterna i blocket hålls i minnet (per fysisk tangent/scan code, så
-layouten är densamma oavsett språk). Inga andra tangenter lagras, inget loggas, inget skrivs till disk.
-Precis som för musen: programmet observerar bara, det injicerar eller blockerar ingenting.
+**Keyboard and privacy:** Raw Input for the keyboard is only registered while `KeyboardEnabled` is on. Only the
+up/down state of the 27 keys in the block is kept in memory, per physical key (scan code), so the layout is the same
+for every keyboard language. No other keys are stored, nothing is logged and nothing is written to disk. Just like
+with the mouse, the program only observes; it doesn't inject or block anything.
 
-**Kantutjämning:** allt som ritas på en panel, i musytan eller på en bakgrundsbild är kantutjämnat
-(swipe, kontur, pil, prick, tangenter, ramar). Hårda, 2×2-justerade kanter används bara där något
-direkt möter chroma-färgen (panelens ytterkant, eller swipen när varken ram eller musyta är på), annars
-blir det en grön kant efter keying. Preview-fönstret skalar mjukt, så bilden ser jämn ut även när
-fönstret har en annan storlek än videon eller Windows-skalningen är över 100 %.
+**Anti-aliasing:** everything drawn on a panel, in the mouse area or on a background picture is anti-aliased
+(swipe, outline, arrow, dot, keys, labels, frames). Hard, 2×2-aligned edges are only used where something directly
+touches the chroma colour (the panel's outer edge, or the swipe when neither frame nor mouse area is on);
+anything else would leave a green fringe after keying. The preview window scales smoothly, so the picture looks
+clean even when the window is a different size from the video or Windows display scaling is above 100 %.
 
-Ramen och tangentbordet ritas i ett cachat statiskt lager: bakgrund + ram byggs om bara när stil eller
-storlek ändras, tangentbordet bara när en tangent går upp/ner. Kanterna är 2×2-blockjusterade i
-chroma-safe-läget, så ingen grön halo uppstår efter NV12 och keying.
+The frame and keyboard are drawn in a cached static layer. The background, picture and frames are rebuilt only
+when the style or size changes, and the keyboard only when a key goes up or down.
 
-**Diagnostics** (Settings, nederst) visar bland annat:
+**Diagnostics** (bottom of Settings) shows, among other things:
 
 ```
 Virtual Camera API supported: YES
 MediaSource registered: YES (C:\Program Files\MouseSwipeVisualizer\MouseSwipeVisualizer.VirtualCamera.dll)
 Virtual camera registered: YES
 Virtual camera enumerable: YES
-Camera friendly name: Mouse Swipe Visualizer Camera (Windows Virtuell Kamera)
+Camera friendly name: Mouse Swipe Visualizer Camera (Windows Virtual Camera)
 Camera active consumer: YES/NO
 Requested format: 1280x720 NV12 @ 30 FPS
 Frames produced / Frames consumed / Dropped/repeated frames
@@ -286,94 +294,113 @@ Camera side: conversion … ms, sample creation total … ms
 Last consumer start / Last error
 ```
 
-plus engine-statistik (input events/s, dx/dy, frame-tider per steg, allokering per bild).
+It also shows engine statistics (input events/s, dx/dy, frame times per stage, allocation per frame).
 
 ---
 
-## OBS-läget (fallback)
+## OBS mode (fallback)
 
-Output mode = **OBS Capture Window** → preview-fönstret *"Mouse Swipe Visualizer"* är OBS-källan (Window: [MouseSwipeVisualizer.exe]: Mouse Swipe Visualizer)
-(som i v2): *Sources → + → Window Capture*, Capture Method *Windows 10 (1903 and up)*, *Client Area* på,
-*Filters → Chroma Key → Green*. Fönstret får ligga bakom spelet men ska inte minimeras.
+With Output mode = **OBS Capture Window**, the preview window *"Mouse Swipe Visualizer"* is the OBS source
+(Window: [MouseSwipeVisualizer.exe]: Mouse Swipe Visualizer): *Sources → + → Window Capture*, Capture Method
+*Windows 10 (1903 and up)*, *Client Area* on, *Filters → Chroma Key → Green*. The window may sit behind the game
+but must not be minimized.
 
 ---
 
-## Tester
+## Tests
 
 ```bash
 MouseSwipeVisualizer.exe --selftest [--selftest-filter text] [--selftest-skip-camera] [--selftest-input-seconds 10]
 ```
 
-Rapport: `%LocalAppData%\MouseSwipeVisualizer\selftest.txt` (+ PNG-bilder). Senaste körning: **264/264 PASS**. Innehåller:
+The report goes to `%LocalAppData%\MouseSwipeVisualizer\selftest.txt`, together with PNG frames for visual
+inspection. It covers:
 
-* alla tidigare tester (Raw Input, tracker, lift, settings, placering, fönsteregenskaper …),
-* **off-screen**: rendering utan fönster, chroma-safe, **0 halo-pixlar även efter BGRA→NV12→BGRA**,
-* **headless**: kamera-utgången får nya, ändrade bilder när preview är synlig/täckt/minimerad/dold/stängd,
-* **kamera in-process** och **kamera genom Windows Frame Server** (samma svit):
-  uppräkning via `MFEnumDeviceSources`, öppning med `IMFSourceReader`, fallback-bilder utan app, begärt format
-  når appen, **höger-flick / kurva / vänster-flick / lyft+re-center** läses genom kameran och kontrolleras pixel för
-  pixel (riktning, 0 halo), 30 och 60 FPS (NV12 + RGB32, 800×800 och 1280×720) med kontroll av timestamps,
-  durations, discontinuity-flagga och kadens, konsument stoppar → appen slutar producera, app-krasch → fallback,
-  app-omstart → återanslutning, två konsumenter.
+* Raw Input, tracker, lift detection, settings, window placement and window properties,
+* **off-screen rendering**: no window, chroma-safe, **0 halo pixels even after BGRA→NV12→BGRA**,
+* **keyboard panel and frames**: the 40/60 split and all positions, key presses only change their own key,
+  left/right modifiers, the static layer cache, frame and mouse area sizes (content only shrinks when an edge reaches
+  it), anti-aliasing, background picture, glass and borderless modes,
+* **headless**: the camera output keeps getting new frames while the preview is visible, covered, minimized, hidden
+  or closed,
+* **camera in-process** and **camera through the Windows Frame Server** (same suite):
+  enumeration through `MFEnumDeviceSources`, opening with `IMFSourceReader`, fallback frames without the app, the
+  requested format reaching the app, and **right flick / curve / left flick / lift + re-centre** read back through
+  the camera and checked pixel by pixel (direction, 0 halo). It runs at 30 and 60 FPS (NV12 + RGB32, 800×800 and
+  1280×720) and checks timestamps, durations, the discontinuity flag and cadence. It also covers: consumer stops →
+  the app stops producing, app crash → fallback, app restart → reconnect, and two consumers.
 
-Livscykel (upphöjt, `installer/lifecycle-test.ps1`): ta bort dev-registrering → MSI-installation → läs-test →
-MSI-avinstallation → **0 kamera-device nodes, ingen COM-nyckel, inga filer** → ominstallation.
+The camera tests need the camera to themselves: close other copies of the app and any app that has the camera open
+before running them.
 
-**Två appar samtidigt** (uppmätt): den första konsumenten strömmar ostört vidare; en andra *process* får
-`MF_E_HW_MFT_FAILED_START_STREAMING (0xC00D3704)` – samma beteende som en fysisk webbkamera som redan används.
-Två läsare i *samma* process delar strömmen.
+Lifecycle (elevated, `installer/lifecycle-test.ps1`): remove the development registration → install the MSI → read
+test → uninstall the MSI → **0 camera device nodes, no COM key, no files** → reinstall.
+
+**Two apps at the same time** (measured): the first consumer keeps streaming undisturbed; a second *process* gets
+`MF_E_HW_MFT_FAILED_START_STREAMING (0xC00D3704)`, the same behaviour as a physical webcam that is already in use.
+Two readers in the *same* process share the stream.
 
 ---
 
-## Prestanda (uppmätt, Release)
+## Performance (measured, Release)
 
 | | |
 |---|---|
-| Engine per bild (800×800) | input+modell ~0,02 ms, rasterisering ~1 ms, publicering ~0,5 ms, **0 B allokering/bild** |
-| Kamerasidan (Frame Server) | BGRA→NV12 **0,34 ms** för ny bild (snabbväg för enfärgade 2×2-block), upprepad bild = radkopiering från cache; hel sample ~0,7 ms |
-| CPU, app | **5,7 %** av en kärna vid 800×800@60 med aktiv swipe; 4,8 % vid 1280×720@30; **0,00 %** utan konsument |
-| Kadens | 59,95–60,00 FPS / 30,00 FPS genom Frame Server, max-intervall ~18 ms vid 60 FPS |
+| Engine per frame (1280×720, keyboard + frames) | input + model ~0.02 ms, rasterization ~1.3 ms, publishing ~0.7 ms, **0 B allocated per frame** |
+| Camera side (Frame Server) | BGRA→NV12 **0.34 ms** for a new frame (fast path for uniform 2×2 blocks); a repeated frame is a row copy from the cache; a whole sample ~0.7 ms |
+| CPU, app | **5.7 %** of one core at 800×800@60 while swiping; 4.8 % at 1280×720@30; **0.00 %** without a consumer |
+| Cadence | 59.95–60.00 FPS / 30.00 FPS through the Frame Server, max interval ~18 ms at 60 FPS on an idle machine |
 
 ---
 
 ## Troubleshooting
 
-**Kameran syns inte** – kör `--camera-status`. *MediaSource registered: NO* → installera (MSI eller
-`--camera-install`). *Virtual camera registered: NO* → `--camera-register` eller starta appen. Windows 10 stöds inte.
+**The camera doesn't show up.** Run `--camera-status`. *MediaSource registered: NO* → install it (MSI or
+`--camera-install`). *Virtual camera registered: NO* → run `--camera-register` or start the app. Windows 10 is not
+supported.
 
-**Kameran är grön utan swipe** – appen kör inte (fallback-bild), eller Output mode = OBS. Starta appen
-(`--headless` räcker). Diagnostics: *Camera active consumer: YES* och *Frames produced* ska öka när du rör musen.
+**The camera is green without a swipe.** The app isn't running (fallback picture), or Output mode = OBS. Start the
+app (`--headless` is enough). In Diagnostics, *Camera active consumer* should be *YES* and *Frames produced* should
+go up when you move the mouse.
 
-**"Kameran används redan" / 0xC00D3704** – en annan app har kameran öppen. Stäng den (kameran kan bara
-strömmas av en app åt gången, som en vanlig webbkamera).
+**"Camera already in use" / 0xC00D3704.** Another app has the camera open. Close it; like a normal webcam, the
+camera can only be streamed by one app at a time.
 
-**Swipen rör sig inte i spel** – kör spelet som administratör? Då måste även visualizern köras som administratör
-(Windows levererar inte input från en upphöjd process till en icke-upphöjd).
+**The swipe doesn't move in games.** Is the game running as administrator? Then the visualizer must also run as
+administrator, because Windows doesn't deliver input from an elevated process to a non-elevated one.
 
-**Felsöka media source** – den körs i tjänsten *FrameServer* (`svchost`). Spårutskrifter via `OutputDebugString`
-(DebugView). Fel publiceras även i Diagnostics (*Last error*).
+**The preview looks blocky.** Update to 3.0.8 or later; older versions scaled the preview with nearest-neighbour
+sampling.
 
-**Loggar** – `%LocalAppData%\MouseSwipeVisualizer\logs\app.log`.
+**Debugging the media source.** It runs inside the *FrameServer* service (`svchost`). Trace output goes through
+`OutputDebugString` (use DebugView). Errors also show up in Diagnostics (*Last error*).
+
+**Logs:** `%LocalAppData%\MouseSwipeVisualizer\logs\app.log`.
 
 ---
 
-## Projektstruktur
+## Project structure
 
-| Sökväg | Innehåll |
+| Path | Contents |
 |---|---|
-| `src/MouseSwipeVisualizer/` | C# WPF-app: Raw Input, swipe-motor, rasterisering, UI, kamera-länk, kommandon, självtest |
-| `src/MouseSwipeVisualizer/Engine/` | `SwipeEngine` (egen tråd/timing), `PreviewFrameStore`, `EngineStats` |
-| `src/MouseSwipeVisualizer/Rendering/` | `SwipeRenderModel`, `SwipeModelBuilder`, `SoftwareRasterizer` |
-| `src/MouseSwipeVisualizer/Camera/` | `CameraFrameLink` (delat minne), `VirtualCameraService`, `CameraCommands`, `CameraConsumer`, P/Invoke |
+| `src/MouseSwipeVisualizer/` | C# WPF app: Raw Input, swipe engine, rendering, UI, camera link, commands, self-test |
+| `src/MouseSwipeVisualizer/Engine/` | `SwipeEngine` (own thread/timing), `PreviewFrameStore`, `EngineStats` |
+| `src/MouseSwipeVisualizer/Input/` | `RawMouseInput` (mouse + keyboard Raw Input), `KeyboardLayout` / `KeyboardState`, `MouseDeltaBuffer` |
+| `src/MouseSwipeVisualizer/Rendering/` | `SwipeRenderModel`, `SwipeModelBuilder`, `SoftwareRasterizer`, `OverlayLayout` (frame/keyboard/swipe layout, key glyphs), `BackgroundImage` (picture loading and blur) |
+| `src/MouseSwipeVisualizer/Camera/` | `CameraFrameLink` (shared memory), `VirtualCameraService`, `CameraCommands`, `CameraConsumer`, P/Invoke |
 | `src/MouseSwipeVisualizer.VirtualCamera/` | C++ media source: `SwipeMediaSource`, `SwipeMediaStream`, `SwipeMediaSourceActivate`, `FrameLink`, `PixelConvert`, `CameraControl` (exports), `dllmain` (COM) |
 | `src/MouseSwipeVisualizer.Shared/` | `SharedFrameProtocol.h` / `.cs` |
-| `installer/` | WiX-MSI (`Package.wxs`), `build-installer.ps1`, `upgrade-install.ps1`, `lifecycle-test.ps1` |
+| `installer/` | WiX MSI (`Package.wxs`), `build-installer.ps1`, `upgrade-install.ps1`, `lifecycle-test.ps1` |
 
-### Baserat på Microsofts sample
+### Based on Microsoft's sample
 
-Media source-arkitekturen följer Microsofts **Windows-Camera / Samples/VirtualCamera** (MIT License,
-© Microsoft Corporation): `SimpleMediaSource`/`SimpleMediaStream` (händelseköer, `Start`/`Stop`/`Shutdown`,
-`IMFMediaStream2`-tillstånd, stream-attribut, sensorprofiler, `IMFSampleAllocatorControl`),
-`VirtualCameraMediaSourceActivate` (IMFActivate-mönstret), `VCamUtils` (registrering/borttagning, device-node-
-städning via `CustomCaptureSourceClsid`). Koden är omskriven med WRL (inga NuGet-beroenden) och utökad med
-takthållning, fallback-allocator, IPC, konvertering och cache. Filer som bygger på samplet har MIT-attribution i huvudet.
+The media source architecture follows Microsoft's **Windows-Camera / Samples/VirtualCamera** (MIT License,
+© Microsoft Corporation):
+
+* `SimpleMediaSource`/`SimpleMediaStream`: event queues, `Start`/`Stop`/`Shutdown`, `IMFMediaStream2` state, stream
+  attributes, sensor profiles, `IMFSampleAllocatorControl`,
+* `VirtualCameraMediaSourceActivate`: the IMFActivate pattern,
+* `VCamUtils`: registration and removal, device-node cleanup through `CustomCaptureSourceClsid`.
+
+The code is rewritten with WRL (no NuGet dependencies) and extended with pacing, a fallback allocator, IPC,
+conversion and caching. Files based on the sample carry an MIT attribution in their header.
