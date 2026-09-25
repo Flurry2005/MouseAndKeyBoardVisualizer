@@ -62,6 +62,22 @@ public sealed class SwipeModelBuilder
     private uint _dotColor = 0xFFFFFFFF;
     private uint _outlineColor = 0xFF141418;
     private OverlayStyle _style = OverlayStyle.From(new AppSettings());
+    private OverlayStyle _configuredStyle = OverlayStyle.From(new AppSettings());
+    private string? _imageOverride;
+
+    /// <summary>
+    /// Replaces the background picture (e.g. with the Spotify cover) until set back to null; the rest of
+    /// the style is untouched. Engine thread only.
+    /// </summary>
+    public void SetImageOverride(string? path)
+    {
+        _imageOverride = path;
+        _style = WithImageOverride(_configuredStyle);
+        _styleVersion++;
+    }
+
+    private OverlayStyle WithImageOverride(OverlayStyle style) =>
+        _imageOverride == null ? style : style with { BackgroundImage = _imageOverride };
     private long _styleVersion;
     private long _smoothingHalfWindowTicks;
     private uint _trailColor = 0xFFFFFFFF;
@@ -95,7 +111,8 @@ public sealed class SwipeModelBuilder
         _dotSize = settings.DotSize;
         _dotColor = ToArgb(AppSettings.ParseColorOrDefault(settings.DotColor, Colors.White), opaque: true);
         _outlineColor = ToArgb(AppSettings.ParseColorOrDefault(settings.OutlineColor, ChromaSafeOutlineColor), opaque: true);
-        _style = OverlayStyle.From(settings);
+        _configuredStyle = OverlayStyle.From(settings);
+        _style = WithImageOverride(_configuredStyle);
         _styleVersion++;
         _thickness = settings.TrailThickness;
         _outlineEnabled = settings.OutlineEnabled;

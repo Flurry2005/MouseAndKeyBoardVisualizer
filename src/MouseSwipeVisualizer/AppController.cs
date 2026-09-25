@@ -12,6 +12,8 @@ using MouseSwipeVisualizer.Swipe;
 using MouseSwipeVisualizer.Utilities;
 using static MouseSwipeVisualizer.Interop.NativeMethods;
 
+using MouseSwipeVisualizer.Spotify;
+
 namespace MouseSwipeVisualizer;
 
 /// <summary>
@@ -37,6 +39,7 @@ public sealed class AppController : ISettingsHost, IDisposable
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _statsTimer;
     private readonly StringBuilder _statsText = new(2048);
+    private readonly SpotifyService _spotify;
 
     private CaptureWindow? _capture;
     private IntPtr _captureHwnd;
@@ -71,6 +74,9 @@ public sealed class AppController : ISettingsHost, IDisposable
 
         _statsTimer = new DispatcherTimer { Interval = StatsInterval };
         _statsTimer.Tick += (_, _) => UpdateStats();
+
+        _spotify = new SpotifyService(AppPaths.DataDirectory);
+        _spotify.CoverChanged += path => _engine.SetBackgroundOverride(path);
     }
 
     public AppSettings Settings { get; private set; }
@@ -103,6 +109,7 @@ public sealed class AppController : ISettingsHost, IDisposable
         }
 
         _statsTimer.Start();
+        _spotify.Configure(Settings);
 
         if (!_headless && Settings.ShowSettingsOnStartup)
         {
@@ -245,6 +252,7 @@ public sealed class AppController : ISettingsHost, IDisposable
         Settings.Sanitize();
         _engine.ApplySettings(Settings);
         _capture?.ApplySettings(Settings);
+        _spotify.Configure(Settings);
         SettingsApplied?.Invoke(Settings);
         if (Settings.OutputMode == OutputMode.ObsCaptureWindow && _capture == null && !_headless)
         {
@@ -269,6 +277,19 @@ public sealed class AppController : ISettingsHost, IDisposable
 
     public Task<string> RunCameraActionAsync(CameraAction action) =>
         CameraActionHandler?.Invoke(action) ?? Task.FromResult("Camera support is not available in this build.");
+
+    public string SpotifyStatus() => _spotify.Status;
+
+    public bool SpotifyHasSavedSecret => _spotify.HasSavedSecret;
+
+    public Task<string> ConnectSpotifyAsync(string clientId, string? clientSecret)
+    {
+        Settings.SpotifyClientId = clientId.Trim();
+        OnSettingsEdited();
+        return _spotify.ConnectAsync(clientId, clientSecret);
+    }
+
+    public void DisconnectSpotify() => _spotify.Disconnect();
 
     private void ScheduleSave()
     {
@@ -429,6 +450,7 @@ public sealed class AppController : ISettingsHost, IDisposable
             Logger.Error("Saving settings on exit failed.", ex);
         }
 
+        _spotify.Dispose();
         _tray?.Dispose();
         _settingsWindow?.Close();
         _capture?.Close();

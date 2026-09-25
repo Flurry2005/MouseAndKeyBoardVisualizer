@@ -31,6 +31,20 @@ public interface ISettingsHost
 
     /// <summary>One-line virtual camera state for the Output group.</summary>
     string CameraSummary();
+
+    /// <summary>Spotify connection / now-playing line.</summary>
+    string SpotifyStatus() => "Spotify is not available.";
+
+    /// <summary>True when a client secret is saved (encrypted), so the field may stay empty.</summary>
+    bool SpotifyHasSavedSecret => false;
+
+    /// <summary>Runs the Spotify sign-in in the browser; <paramref name="clientSecret"/> empty = keep the saved one.</summary>
+    Task<string> ConnectSpotifyAsync(string clientId, string? clientSecret) => Task.FromResult("Spotify is not available.");
+
+    /// <summary>Forgets the saved Spotify secret and tokens.</summary>
+    void DisconnectSpotify()
+    {
+    }
 }
 
 public enum CameraAction
@@ -104,6 +118,7 @@ public partial class SettingsWindow : Window
             AppSettings.MinSwipeBoxPercent, AppSettings.MaxSwipeBoxPercent, "0");
 
         BindBackgroundImage();
+        BindSpotify();
         BindSlider(BgBlurSlider, BgBlurBox, () => _host.Settings.BackgroundImageBlur, v => _host.Settings.BackgroundImageBlur = v, 0, AppSettings.MaxImageBlur, "0");
         BindSlider(BgDimSlider, BgDimBox, () => _host.Settings.BackgroundImageDim, v => _host.Settings.BackgroundImageDim = v, 0, AppSettings.MaxImageDim, "0");
         BindCheck(GlassCheck, () => _host.Settings.GlassEnabled, v => _host.Settings.GlassEnabled = v);
@@ -403,6 +418,119 @@ public partial class SettingsWindow : Window
             RefreshAll();
         };
         _refreshers.Add(() => check.IsChecked = get());
+    }
+
+    private void BindSpotify()
+    {
+        BindCheck(SpotifyCheck, () => _host.Settings.SpotifyCoverEnabled, v => _host.Settings.SpotifyCoverEnabled = v);
+        BindSlider(SpotifyPollSlider, SpotifyPollBox, () => _host.Settings.SpotifyPollSeconds, v => _host.Settings.SpotifyPollSeconds = v,
+            AppSettings.MinSpotifyPollSeconds, AppSettings.MaxSpotifyPollSeconds, "0");
+
+        void CommitClientId()
+        {
+            if (_updating)
+            {
+                return;
+            }
+
+            string id = SpotifyClientIdBox.Text.Trim();
+            SpotifyClientIdBox.Text = id;
+            if (id != _host.Settings.SpotifyClientId)
+            {
+                _host.Settings.SpotifyClientId = id;
+                _host.OnSettingsEdited();
+            }
+        }
+
+        void CommitPort()
+        {
+            if (_updating)
+            {
+                return;
+            }
+
+            if (int.TryParse(SpotifyPortBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port) && port is >= 1024 and <= 65535)
+            {
+                if (port != _host.Settings.SpotifyRedirectPort)
+                {
+                    _host.Settings.SpotifyRedirectPort = port;
+                    _host.OnSettingsEdited();
+                }
+            }
+
+            SpotifyPortBox.Text = _host.Settings.SpotifyRedirectPort.ToString(CultureInfo.InvariantCulture);
+            SpotifyRedirectBox.Text = Spotify.SpotifyService.RedirectUri(_host.Settings.SpotifyRedirectPort);
+        }
+
+        SpotifyClientIdBox.LostKeyboardFocus += (_, _) => CommitClientId();
+        SpotifyPortBox.LostKeyboardFocus += (_, _) => CommitPort();
+        SpotifyClientIdBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitClientId();
+            }
+        };
+        SpotifyPortBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitPort();
+            }
+        };
+
+        bool connecting = false;
+        void UpdateStatus()
+        {
+            if (!connecting)
+            {
+                SpotifyStatusText.Text = _host.SpotifyStatus();
+            }
+
+            SpotifySecretHint.Text = _host.SpotifyHasSavedSecret
+                ? "A client secret is saved (encrypted). Leave the field empty to keep it."
+                : string.Empty;
+        }
+
+        SpotifyConnectButton.Click += async (_, _) =>
+        {
+            CommitClientId();
+            CommitPort();
+            string secret = SpotifySecretBox.Password;
+            SpotifySecretBox.Clear();
+            connecting = true;
+            SpotifyConnectButton.IsEnabled = false;
+            SpotifyStatusText.Text = "Waiting for you to approve access in the browser…";
+            try
+            {
+                SpotifyStatusText.Text = await _host.ConnectSpotifyAsync(_host.Settings.SpotifyClientId, secret);
+            }
+            finally
+            {
+                connecting = false;
+                SpotifyConnectButton.IsEnabled = true;
+                SpotifySecretHint.Text = _host.SpotifyHasSavedSecret ? "A client secret is saved (encrypted). Leave the field empty to keep it." : string.Empty;
+            }
+        };
+        SpotifyDisconnectButton.Click += (_, _) =>
+        {
+            _host.DisconnectSpotify();
+            SpotifySecretBox.Clear();
+            UpdateStatus();
+        };
+
+        var statusTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        statusTimer.Tick += (_, _) => UpdateStatus();
+        statusTimer.Start();
+        Closed += (_, _) => statusTimer.Stop();
+
+        _refreshers.Add(() =>
+        {
+            SpotifyClientIdBox.Text = _host.Settings.SpotifyClientId;
+            SpotifyPortBox.Text = _host.Settings.SpotifyRedirectPort.ToString(CultureInfo.InvariantCulture);
+            SpotifyRedirectBox.Text = Spotify.SpotifyService.RedirectUri(_host.Settings.SpotifyRedirectPort);
+            UpdateStatus();
+        });
     }
 
     private void BindBackgroundImage()

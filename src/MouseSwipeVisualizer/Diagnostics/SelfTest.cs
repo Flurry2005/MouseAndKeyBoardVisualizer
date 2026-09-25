@@ -88,6 +88,7 @@ public static class SelfTest
         report.Run("Synthetic gestures: right flick, left flick, curve, lift/re-center", TestGestureDirections);
         report.Run("Keyboard panel + frame: 40/60 split, key presses, static layer cache, chroma-safe", TestKeyboardPanel);
         report.Run("Anti-aliasing, background image, glass look, borders off", TestGlassAndAntiAliasing);
+        await report.RunAsync("Spotify cover art: secrets, parsing, callback, background override", TestSpotifyAsync);
         await report.RunAsync("Headless engine: preview visible/covered/minimized/hidden/closed", TestHeadlessEngineAsync);
         await report.RunAsync("Preview capture while occluded and unfocused (PrintWindow)", TestOccludedCaptureAsync);
         await report.RunAsync("Rendering cost", TestRenderingCostAsync);
@@ -1254,22 +1255,7 @@ public static class SelfTest
         // 2) Background image: generated 4-colour picture (no green), cover-fitted and blurred.
         string dir = Path.Combine(Path.GetTempPath(), "MouseSwipeVisualizer-selftest");
         Directory.CreateDirectory(dir);
-        string imagePath = Path.Combine(dir, "quadrants.png");
-        var quad = new uint[640 * 360];
-        for (int y = 0; y < 360; y++)
-        {
-            for (int x = 0; x < 640; x++)
-            {
-                quad[y * 640 + x] = x < 320 ? (y < 180 ? 0xFFE03030u : 0xFF3040E0u) : (y < 180 ? 0xFFE0C020u : 0xFFC030C0u);
-            }
-        }
-
-        using (FileStream file = File.Create(imagePath))
-        {
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(640, 360, 96, 96, PixelFormats.Bgra32, null, quad, 640 * 4)));
-            encoder.Save(file);
-        }
+        string imagePath = WriteQuadrantImage(dir);
 
         static int MaxStep(ReadOnlySpan<uint> px, int width, int y, int x0, int x1)
         {
@@ -1342,6 +1328,141 @@ public static class SelfTest
             SavePng(RenderGesture(new AppSettings { BackgroundImagePath = wallpaper, GlassEnabled = true, BordersEnabled = false }, Gesture.Curve, w, h, held).Pixels,
                 w, h, "selftest-glass-noborders.png");
         }
+    }
+
+    /// <summary>640x360 picture with four colours (no green) for background-picture tests.</summary>
+    private static string WriteQuadrantImage(string dir)
+    {
+        string imagePath = Path.Combine(dir, "quadrants.png");
+        var quad = new uint[640 * 360];
+        for (int y = 0; y < 360; y++)
+        {
+            for (int x = 0; x < 640; x++)
+            {
+                quad[y * 640 + x] = x < 320 ? (y < 180 ? 0xFFE03030u : 0xFF3040E0u) : (y < 180 ? 0xFFE0C020u : 0xFFC030C0u);
+            }
+        }
+
+        using FileStream file = File.Create(imagePath);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(640, 360, 96, 96, PixelFormats.Bgra32, null, quad, 640 * 4)));
+        encoder.Save(file);
+        return imagePath;
+    }
+
+    private static async Task TestSpotifyAsync(Report r)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "MouseSwipeVisualizer-selftest", "spotify");
+        Directory.CreateDirectory(dir);
+
+        // 1) Secrets: DPAPI-encrypted, plaintext never on disk, never in settings.json.
+        const string secret = "selftest-secret-4f1c9a", refresh = "selftest-refresh-77b2e0";
+        byte[] cipher = Spotify.Dpapi.Protect(Encoding.UTF8.GetBytes(secret));
+        r.Check("DPAPI round trip", Encoding.UTF8.GetString(Spotify.Dpapi.Unprotect(cipher)), secret);
+        string secretsFile = Path.Combine(dir, "spotify.dat");
+        new Spotify.SpotifySecrets { ClientId = "id", ClientSecret = secret, RefreshToken = refresh }.Save(secretsFile);
+        string raw = Encoding.UTF8.GetString(File.ReadAllBytes(secretsFile)) + Encoding.Unicode.GetString(File.ReadAllBytes(secretsFile));
+        r.Check("secrets file does not contain the secret or token in plain text", raw.Contains(secret) || raw.Contains(refresh), false);
+        Spotify.SpotifySecrets loaded = Spotify.SpotifySecrets.Load(secretsFile);
+        r.Check("secrets load back", loaded.ClientSecret == secret && loaded.RefreshToken == refresh && loaded.ClientId == "id", true);
+        File.WriteAllBytes(secretsFile, new byte[] { 1, 2, 3 });
+        r.Check("corrupt secrets file: empty, no crash", Spotify.SpotifySecrets.Load(secretsFile).RefreshToken, null);
+        Spotify.SpotifySecrets.Delete(secretsFile);
+        string settingsJson = System.Text.Json.JsonSerializer.Serialize(new AppSettings { SpotifyClientId = "abc", SpotifyCoverEnabled = true });
+        r.Check("settings.json has no secret/token fields", settingsJson.Contains("Secret", StringComparison.OrdinalIgnoreCase)
+            || settingsJson.Contains("Token", StringComparison.OrdinalIgnoreCase), false);
+
+        // 2) Sign-in URL and settings sanitizing.
+        string url = Spotify.SpotifyClient.AuthorizeUrl("my-client", Spotify.SpotifyService.RedirectUri(8888), "st4te");
+        r.Check("authorize URL: client, redirect, scopes, state", url.StartsWith("https://accounts.spotify.com/authorize?", StringComparison.Ordinal)
+            && url.Contains("client_id=my-client") && url.Contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A8888%2Fcallback")
+            && url.Contains("user-read-currently-playing") && url.Contains("state=st4te"), true, url);
+        var s = new AppSettings { SpotifyPollSeconds = 0.2, SpotifyRedirectPort = 80 };
+        s.Sanitize();
+        r.Check("poll interval and port sanitized", s.SpotifyPollSeconds == AppSettings.MinSpotifyPollSeconds && s.SpotifyRedirectPort == AppSettings.DefaultSpotifyPort, true);
+
+        // 3) Parsing /me/player/currently-playing.
+        const string track = """
+            {"is_playing":true,"item":{"type":"track","name":"Song","artists":[{"name":"A"},{"name":"B"}],
+             "album":{"images":[{"url":"https://i.scdn.co/image/small","width":64},{"url":"https://i.scdn.co/image/big","width":640},{"url":"https://i.scdn.co/image/mid","width":300}]}}}
+            """;
+        Spotify.NowPlaying? now = Spotify.SpotifyClient.ParseCurrentlyPlaying(track);
+        r.Check("track: title, artists, largest cover", now is { Title: "Song", Artist: "A, B", ImageUrl: "https://i.scdn.co/image/big", IsPlaying: true }, true, now?.ToString());
+        const string episode = """
+            {"is_playing":false,"item":{"type":"episode","name":"Ep","show":{"name":"Show","images":[{"url":"https://i.scdn.co/image/show","width":640}]},
+             "images":[{"url":"https://i.scdn.co/image/ep","width":640}]}}
+            """;
+        Spotify.NowPlaying? ep = Spotify.SpotifyClient.ParseCurrentlyPlaying(episode);
+        r.Check("episode: show name, episode cover, paused", ep is { Title: "Ep", Artist: "Show", ImageUrl: "https://i.scdn.co/image/ep", IsPlaying: false }, true, ep?.ToString());
+        r.Check("nothing playing / ad / garbage → null", Spotify.SpotifyClient.ParseCurrentlyPlaying("""{"is_playing":true,"item":null}""") == null
+            && Spotify.SpotifyClient.ParseCurrentlyPlaying("not json") == null && Spotify.SpotifyClient.ParseCurrentlyPlaying("") == null, true);
+        r.Check("cover URLs only from Spotify CDNs over HTTPS",
+            Spotify.SpotifyClient.IsAllowedImageUrl("https://i.scdn.co/image/ab67") && Spotify.SpotifyClient.IsAllowedImageUrl("https://image-cdn-ak.spotifycdn.com/image/x")
+            && !Spotify.SpotifyClient.IsAllowedImageUrl("http://i.scdn.co/image/ab67") && !Spotify.SpotifyClient.IsAllowedImageUrl("https://i.scdn.co.evil.example/x")
+            && !Spotify.SpotifyClient.IsAllowedImageUrl("https://evil.example/i.scdn.co") && !Spotify.SpotifyClient.IsAllowedImageUrl("file:///C:/x.png")
+            && !Spotify.SpotifyClient.IsAllowedImageUrl("https://i.scdn.co:8443/x"), true);
+
+        // 4) OAuth redirect listener on 127.0.0.1 (random free port).
+        int port;
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using (var listener = Spotify.LoopbackCallback.Start(port))
+        using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) })
+        {
+            Task<Dictionary<string, string>> wait = listener.WaitAsync("/callback", TimeSpan.FromSeconds(10), CancellationToken.None);
+            using System.Net.Http.HttpResponseMessage other = await http.GetAsync($"http://127.0.0.1:{port}/favicon.ico");
+            r.Check("callback: other paths get 404 and keep waiting", other.StatusCode == System.Net.HttpStatusCode.NotFound && !wait.IsCompleted, true);
+            using System.Net.Http.HttpResponseMessage cb = await http.GetAsync($"http://127.0.0.1:{port}/callback?code=a%2Bb%20c&state=xyz");
+            Dictionary<string, string> query = await wait;
+            r.Check("callback: returns code and state, answers 200", cb.IsSuccessStatusCode && query.GetValueOrDefault("code") == "a+b c"
+                && query.GetValueOrDefault("state") == "xyz", true);
+        }
+
+        bool busy = false;
+        using (var first = Spotify.LoopbackCallback.Start(port))
+        {
+            try
+            {
+                using var second = Spotify.LoopbackCallback.Start(port);
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                busy = true;
+            }
+        }
+
+        r.Check("callback port in use is reported (not silently shared)", busy, true);
+
+        // 5) The cover replaces the frame picture through the engine's override, and goes away again.
+        string cover = WriteQuadrantImage(dir);
+        const int w = 1280, h = 720;
+        var builder = new SwipeModelBuilder();
+        builder.Configure(new AppSettings());
+        var tracker = new SwipeTracker();
+        var model = new SwipeRenderModel();
+        var raster = new SoftwareRasterizer();
+        uint FramePixel()
+        {
+            builder.Build(tracker, w, h, MonotonicClock.Now, model);
+            raster.Render(model);
+            return raster.Pixels[12 * w + 100];
+        }
+
+        uint plain = FramePixel();
+        builder.SetImageOverride(cover);
+        uint withCover = FramePixel();
+        builder.SetImageOverride(null);
+        uint after = FramePixel();
+        r.Check("cover override shows in the frame, then back to the frame colour",
+            (plain & 0xFFFFFFu) == 0 && Brightness(withCover) > 90 && (after & 0xFFFFFFu) == 0, true, $"0x{plain:X8} 0x{withCover:X8} 0x{after:X8}");
+
+        var service = new Spotify.SpotifyService(dir);
+        r.Check("service without credentials: not connected", service.IsConnected || service.HasSavedSecret, false);
+        string message = await service.ConnectAsync("", null);
+        r.Check("connect without client ID is refused before opening a browser", message.Contains("Client ID"), true, message);
+        service.Dispose();
     }
 
     private static void TestGestureDirections(Report r)

@@ -85,6 +85,8 @@ public sealed class AppSettings
     public const double MinDotSize = 2, MaxDotSize = 48, DefaultDotSize = 12;
     public const int MinKeyboardSplit = 20, MaxKeyboardSplit = 70, DefaultKeyboardSplit = 40;
     public const double MinSwipeBoxPercent = 20, MaxSwipeBoxPercent = 100;
+    public const double MinSpotifyPollSeconds = 1, MaxSpotifyPollSeconds = 60, DefaultSpotifyPollSeconds = 3;
+    public const int DefaultSpotifyPort = 8888;
     public const double MaxImageBlur = 100, MaxImageDim = 90, MaxGlassOpacity = 60, MaxGlassBlur = 100;
     public const double MaxFrameBorder = 16, MaxFrameRadius = 80, MaxFrameMargin = 80, MaxFramePadding = 80;
     public const string DefaultChromaKeyColor = "#00FF00";
@@ -241,6 +243,20 @@ public sealed class AppSettings
     /// <summary>Borders on frame, mouse box and keys.</summary>
     public bool BordersEnabled { get; set; } = true;
 
+    // ------------------------------------------------------------------ Spotify cover art
+
+    /// <summary>Use the cover of what is playing on Spotify as the frame background (overrides the picture).</summary>
+    public bool SpotifyCoverEnabled { get; set; }
+
+    /// <summary>Client ID of the user's own Spotify app. The client secret is NOT stored here (DPAPI file).</summary>
+    public string SpotifyClientId { get; set; } = string.Empty;
+
+    /// <summary>How often to check what is playing (s).</summary>
+    public double SpotifyPollSeconds { get; set; } = DefaultSpotifyPollSeconds;
+
+    /// <summary>Port of the local OAuth redirect: http://127.0.0.1:PORT/callback.</summary>
+    public int SpotifyRedirectPort { get; set; } = DefaultSpotifyPort;
+
     // ------------------------------------------------------------------ output
 
     /// <summary>Primary output. The camera is the default; the OBS window stays as a fallback.</summary>
@@ -323,6 +339,14 @@ public sealed class AppSettings
         SwipeBoxCornerRadius = Clamp(nameof(SwipeBoxCornerRadius), SwipeBoxCornerRadius, 0, MaxFrameRadius, 12, fixes);
         SwipeBoxPadding = Clamp(nameof(SwipeBoxPadding), SwipeBoxPadding, 0, MaxFramePadding, 10, fixes);
         BackgroundImagePath = BackgroundImagePath?.Trim().Trim('"') ?? string.Empty;
+        SpotifyClientId = SpotifyClientId?.Trim() ?? string.Empty;
+        SpotifyPollSeconds = Clamp(nameof(SpotifyPollSeconds), SpotifyPollSeconds, MinSpotifyPollSeconds, MaxSpotifyPollSeconds, DefaultSpotifyPollSeconds, fixes);
+        if (SpotifyRedirectPort is < 1024 or > 65535)
+        {
+            fixes.Add($"{nameof(SpotifyRedirectPort)} {SpotifyRedirectPort} → {DefaultSpotifyPort}");
+            SpotifyRedirectPort = DefaultSpotifyPort;
+        }
+
         BackgroundImageBlur = Clamp(nameof(BackgroundImageBlur), BackgroundImageBlur, 0, MaxImageBlur, 24, fixes);
         BackgroundImageDim = Clamp(nameof(BackgroundImageDim), BackgroundImageDim, 0, MaxImageDim, 20, fixes);
         GlassOpacity = Clamp(nameof(GlassOpacity), GlassOpacity, 0, MaxGlassOpacity, 12, fixes);

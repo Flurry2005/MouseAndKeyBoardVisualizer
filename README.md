@@ -32,7 +32,8 @@ minimized, hidden or closed, or when the app runs in the tray only (`--headless`
 **Keyboard and frames.** By default the picture is split 40/60. On the left is a keyboard block (Esc–5, Tab–T,
 Caps–G, Shift–B, Ctrl/Alt/Space) where held keys light up. On the right is the swipe in its own box (the mouse
 area). Everything sits on a styled panel (the "frame") with a background, border colour, border width and rounded
-corners. A background picture can fill the frame, with an optional frosted-glass look. Everything is configurable
+corners. A background picture, or the cover art of what's playing on Spotify, can fill the frame, with an
+optional frosted-glass look. Everything is configurable
 (see [Settings](#settings)). The keyboard and frames can be turned off for a plain full-picture swipe.
 
 The program only **observes** input. It does not inject, change or block anything and never touches the game
@@ -69,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.8.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.9.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -255,6 +256,10 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `BackgroundImageBlur` / `BackgroundImageDim` | 24 / 20 | Blur (px) and darkening (%) of the background picture. |
 | `GlassEnabled` | false | Glass look: the frame, mouse area and keys become frosted, see-through glass over an extra-blurred copy of the background picture. Pressed keys stay solid. |
 | `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glass tint, tint strength (%) and extra frost blur (px). |
+| `SpotifyCoverEnabled` | false | Use the cover of what's playing on Spotify as the frame picture (see [Spotify cover art](#spotify-cover-art)). |
+| `SpotifyClientId` | empty | Client ID of your own Spotify app. The client secret is **not** stored in settings.json. |
+| `SpotifyPollSeconds` | 3 | How often to check what's playing (1–60 s); the cover changes within this time after a song change. |
+| `SpotifyRedirectPort` | 8888 | Port of the local sign-in redirect `http://127.0.0.1:PORT/callback`. |
 | `BordersEnabled` | true | Borders on the frame, mouse area and keys (off = borderless). |
 | `FrameEnabled` | true | Draw the panel (the "frame") behind the keyboard and swipe. |
 | `FrameBackgroundColor` / `FrameBorderColor` | `#000000` / `#E6E6E6` | Panel background and border. |
@@ -264,6 +269,37 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `RenderFps` | 60 | Preview frame rate when no camera consumer sets the pace. |
 | `IncludeDebugInCapture` | false | Debug text in the OBS window (development). |
 | `ShowSettingsOnStartup` | true | Open Settings at start. |
+
+### Spotify cover art
+
+Shows the album (or podcast) cover of what's playing on your Spotify account as the frame background. It uses
+the same blur, dim and glass settings as a background picture, and falls back to your normal background when
+nothing is playing.
+
+Setup (once):
+
+1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and click **Create app**. Any name
+   and description will do. Under **Redirect URIs** add exactly `http://127.0.0.1:8888/callback` (Settings shows the
+   URI; it changes if you change the callback port). Under APIs, tick **Web API**.
+2. In the app's settings, copy the **Client ID** and click **View client secret** to copy the secret.
+3. In Mouse Swipe Visualizer, go to **Settings → Spotify cover art**. Paste both, click **Connect Spotify…** and
+   approve access in the browser that opens.
+4. Tick **Use the cover of what's playing on Spotify** and choose how often to check (**Check every … s**, default 3).
+
+Apps in Spotify's development mode only work for their owner and for users you add under *User Management* in the
+dashboard.
+
+Security and privacy:
+
+* Access is read-only: the scopes are `user-read-currently-playing` and `user-read-playback-state`.
+* The client secret and the refresh token are stored encrypted with Windows DPAPI for your Windows account, in
+  `%LocalAppData%\MouseSwipeVisualizer\spotify.dat`. They are never written to settings.json, never logged and
+  never shown again in the UI. **Disconnect** deletes them.
+* The sign-in redirect is received by a one-shot listener bound to 127.0.0.1 only. It checks a random `state`
+  value and closes after the sign-in (or after 3 minutes).
+* Covers are only downloaded over HTTPS from Spotify's image servers (max 5 MB), into
+  `%LocalAppData%\MouseSwipeVisualizer\spotify-covers`, which keeps only the last few covers.
+* It polls at most once per second, whatever the settings, and honours Spotify's rate-limit `Retry-After`.
 
 **Keyboard and privacy:** Raw Input for the keyboard is only registered while `KeyboardEnabled` is on. Only the
 up/down state of the 27 keys in the block is kept in memory, per physical key (scan code), so the layout is the same
@@ -321,6 +357,9 @@ inspection. It covers:
 * **keyboard panel and frames**: the 40/60 split and all positions, key presses only change their own key,
   left/right modifiers, the static layer cache, frame and mouse area sizes (content only shrinks when an edge reaches
   it), anti-aliasing, background picture, glass and borderless modes,
+* **Spotify**: encrypted secret storage (nothing in plain text, nothing in settings.json), parsing of tracks,
+  episodes and "nothing playing", the cover URL allowlist, the local sign-in listener, and the cover replacing the
+  frame picture and going away again (no real Spotify account needed),
 * **headless**: the camera output keeps getting new frames while the preview is visible, covered, minimized, hidden
   or closed,
 * **camera in-process** and **camera through the Windows Frame Server** (same suite):
@@ -375,6 +414,11 @@ sampling.
 **Debugging the media source.** It runs inside the *FrameServer* service (`svchost`). Trace output goes through
 `OutputDebugString` (use DebugView). Errors also show up in Diagnostics (*Last error*).
 
+**Spotify: "Spotify refused the sign-in" or the browser shows "INVALID_CLIENT: Invalid redirect URI".** The
+redirect URI in your Spotify app must match the one in Settings exactly, including `127.0.0.1` (Spotify no longer
+accepts `localhost`) and the port. **"Port … is already in use"**: pick another callback port and update the
+redirect URI in the dashboard to match.
+
 **Logs:** `%LocalAppData%\MouseSwipeVisualizer\logs\app.log`.
 
 ---
@@ -387,6 +431,7 @@ sampling.
 | `src/MouseSwipeVisualizer/Engine/` | `SwipeEngine` (own thread/timing), `PreviewFrameStore`, `EngineStats` |
 | `src/MouseSwipeVisualizer/Input/` | `RawMouseInput` (mouse + keyboard Raw Input), `KeyboardLayout` / `KeyboardState`, `MouseDeltaBuffer` |
 | `src/MouseSwipeVisualizer/Rendering/` | `SwipeRenderModel`, `SwipeModelBuilder`, `SoftwareRasterizer`, `OverlayLayout` (frame/keyboard/swipe layout, key glyphs), `BackgroundImage` (picture loading and blur) |
+| `src/MouseSwipeVisualizer/Spotify/` | `SpotifyService` (sign-in, polling, cover cache), `SpotifyClient` (Web API), `LoopbackCallback` (sign-in redirect), `SpotifySecrets` (DPAPI) |
 | `src/MouseSwipeVisualizer/Camera/` | `CameraFrameLink` (shared memory), `VirtualCameraService`, `CameraCommands`, `CameraConsumer`, P/Invoke |
 | `src/MouseSwipeVisualizer.VirtualCamera/` | C++ media source: `SwipeMediaSource`, `SwipeMediaStream`, `SwipeMediaSourceActivate`, `FrameLink`, `PixelConvert`, `CameraControl` (exports), `dllmain` (COM) |
 | `src/MouseSwipeVisualizer.Shared/` | `SharedFrameProtocol.h` / `.cs` |

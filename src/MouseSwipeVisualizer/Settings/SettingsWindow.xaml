@@ -274,6 +274,43 @@
             </Grid>
         </GroupBox>
 
+        <GroupBox Header="Spotify cover art" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <CheckBox x:Name="SpotifyCheck" Grid.ColumnSpan="3" Content="Use the cover of what's playing on Spotify as the frame background" />
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,4" Opacity="0.8"
+                           Text="Create an app at developer.spotify.com (Web API), add the redirect URI below to it, then paste its Client ID and Client secret here and click Connect." />
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Client ID" />
+                <TextBox x:Name="SpotifyClientIdBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Client secret" />
+                <PasswordBox x:Name="SpotifySecretBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3"
+                             ToolTip="Stored encrypted for your Windows account (DPAPI), never in settings.json. Leave empty to keep the saved one." />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Redirect URI" />
+                <TextBox x:Name="SpotifyRedirectBox" Grid.Row="4" Grid.Column="1" Margin="0,3" IsReadOnly="True"
+                         ToolTip="Add exactly this URI under Redirect URIs in your Spotify app's settings." />
+                <TextBox x:Name="SpotifyPortBox" Grid.Row="4" Grid.Column="2" Margin="4,3,0,3" ToolTip="Callback port (1024-65535)" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Check every (s)" />
+                <Slider x:Name="SpotifyPollSlider" Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="60" SmallChange="1" LargeChange="5"
+                        ToolTip="How often to check what is playing; the cover updates within this time after a song change." />
+                <TextBox x:Name="SpotifyPollBox" Grid.Row="5" Grid.Column="2" />
+                <StackPanel Grid.Row="6" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
+                    <Button x:Name="SpotifyConnectButton" Content="Connect Spotify…" Padding="10,2" />
+                    <Button x:Name="SpotifyDisconnectButton" Content="Disconnect" Padding="10,2" Margin="6,0,0,0"
+                            ToolTip="Forget the saved client secret and sign-in" />
+                </StackPanel>
+                <TextBlock x:Name="SpotifyStatusText" Grid.Row="7" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" />
+                <TextBlock x:Name="SpotifySecretHint" Grid.Row="8" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.7" />
+            </Grid>
+        </GroupBox>
+
         <GroupBox Header="Frame (panel behind keyboard and swipe)" Padding="8,4" Margin="0,10,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>

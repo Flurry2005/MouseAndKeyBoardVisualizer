@@ -100,6 +100,17 @@ public sealed class SwipeEngine : IDisposable
         _wake.Set();
     }
 
+    /// <summary>Thread-safe: background picture override (Spotify cover), null = the configured picture.</summary>
+    public void SetBackgroundOverride(string? path)
+    {
+        Volatile.Write(ref _backgroundOverride, path);
+        Interlocked.Exchange(ref _backgroundOverridePending, 1);
+        _wake.Set();
+    }
+
+    private string? _backgroundOverride;
+    private int _backgroundOverridePending;
+
     /// <summary>Wakes the engine, e.g. after an output became active.</summary>
     public void Wake() => _wake.Set();
 
@@ -144,6 +155,12 @@ public sealed class SwipeEngine : IDisposable
         if (settings != null)
         {
             ApplySettingsNow(settings);
+        }
+
+        if (Interlocked.Exchange(ref _backgroundOverridePending, 0) == 1)
+        {
+            _builder.SetImageOverride(Volatile.Read(ref _backgroundOverride));
+            _forceRaster = true;
         }
 
         if (Interlocked.Exchange(ref _clearRequested, 0) == 1)
