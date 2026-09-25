@@ -90,6 +90,8 @@ public sealed class SoftwareRasterizer
     private CoverPalette _palette;
     private OverlayStyle? _drawStyle;
     private uint _trailArgb, _dotArgb, _lastTrail, _lastDot, _trailFrom, _dotFrom;
+    private uint _outlineArgb, _lastOutline, _outlineFrom;
+    private double _swipeBackgroundLuminance = -1; // relative luminance under the mouse area, -1 = unknown
 
     public int Width => _width;
 
@@ -483,11 +485,22 @@ public sealed class SoftwareRasterizer
 
         _base.AsSpan(0, _width * _height).CopyTo(_static);
         OverlayStyle? keyStyle = _drawStyle ?? style;
+        if (keyStyle is { AutoContrast: true, KeyboardEnabled: true } && _imageActive)
+        {
+            // Key outlines must stand out from the picture around the keys (3:1, as for any UI outline).
+            double around = MeasureLuminance(_static, model.Layout.Keyboard);
+            if (around >= 0)
+            {
+                keyStyle = keyStyle with { KeyBorder = CoverPalette.EnsureContrast(keyStyle.KeyBorder, around, 3.0) };
+            }
+        }
+
         if (keyStyle is { KeyboardEnabled: true } && !model.Layout.Keyboard.IsEmpty)
         {
             DrawKeyboard(model, keyStyle);
         }
 
+        _swipeBackgroundLuminance = MeasureLuminance(_static, model.Layout.Swipe);
         _staticKey = staticKey;
         KeyboardLayerBuilds++;
     }
@@ -530,24 +543,73 @@ public sealed class SoftwareRasterizer
     /// <summary>Stroke/dot colours for this frame: accent from the cover if enabled, crossfaded with the picture.</summary>
     private void UpdateSwipeColors(SwipeRenderModel model)
     {
-        uint trail = model.TrailColor, dot = model.DotColor | 0xFF000000u;
+        uint trail = model.TrailColor, dot = model.DotColor | 0xFF000000u, outline = model.OutlineColor | 0xFF000000u;
         if (_imageActive && _palette.HasAccent && model.Style is { AccentTrail: true })
         {
             trail = _palette.Accent;
             dot = _palette.Accent;
         }
 
+        // Auto contrast against what is actually under the mouse area (picture, glass, box colour).
+        if (_imageActive && model.Style is { AutoContrast: true } && _swipeBackgroundLuminance >= 0)
+        {
+            trail = CoverPalette.EnsureContrast(trail, _swipeBackgroundLuminance);
+            dot = CoverPalette.EnsureContrast(dot, _swipeBackgroundLuminance);
+            // A dark stroke needs a light outline to stay separated from its surroundings, and vice versa.
+            double strokeLum = CoverPalette.RelativeLuminance(trail);
+            if (CoverPalette.ContrastRatio(CoverPalette.RelativeLuminance(outline), strokeLum) < 2)
+            {
+                outline = strokeLum < 0.2 ? 0xFFF4F4F6u : 0xFF141418u;
+            }
+        }
+
         if (_fading)
         {
             trail = LerpArgb(_trailFrom, trail, _fadeT);
             dot = LerpArgb(_dotFrom, dot, _fadeT);
+            outline = LerpArgb(_outlineFrom, outline, _fadeT);
         }
 
         _trailArgb = trail;
         _dotArgb = dot;
+        _outlineArgb = outline;
         _lastTrail = trail;
         _lastDot = dot;
+        _lastOutline = outline;
     }
+
+    /// <summary>Average relative luminance of <paramref name="area"/> (sampled), or -1 if empty.</summary>
+    private double MeasureLuminance(uint[] pixels, RectD area)
+    {
+        int x0 = Math.Clamp((int)area.X, 0, _width), x1 = Math.Clamp((int)area.Right, 0, _width);
+        int y0 = Math.Clamp((int)area.Y, 0, _height), y1 = Math.Clamp((int)area.Bottom, 0, _height);
+        if (x1 - x0 < 2 || y1 - y0 < 2)
+        {
+            return -1;
+        }
+
+        double sum = 0;
+        int n = 0;
+        for (int y = y0; y < y1; y += 4)
+        {
+            for (int x = x0; x < x1; x += 4)
+            {
+                sum += CoverPalette.RelativeLuminance(pixels[y * _width + x]);
+                n++;
+            }
+        }
+
+        return n == 0 ? -1 : sum / n;
+    }
+
+    /// <summary>Effective stroke colour of the last frame (after cover accent, contrast and fade; self-test).</summary>
+    public uint EffectiveTrailColor => _trailArgb;
+
+    /// <summary>Effective outline colour of the last frame.</summary>
+    public uint EffectiveOutlineColor => _outlineArgb;
+
+    /// <summary>Relative luminance under the mouse area (self-test), -1 unknown.</summary>
+    public double SwipeBackgroundLuminance => _swipeBackgroundLuminance;
 
     private static uint LerpArgb(uint from, uint to, double t)
     {
@@ -575,6 +637,7 @@ public sealed class SoftwareRasterizer
         }
 
         _trailFrom = _lastTrail;
+        _outlineFrom = _lastOutline;
         _dotFrom = _lastDot;
         _fading = true;
         _fadeStart = now;
@@ -887,7 +950,7 @@ public sealed class SoftwareRasterizer
             DilateToChromaBlocks();
         }
 
-        uint outlineColor = model.OutlineColor | 0xFF000000u;
+        uint outlineColor = _outlineArgb | 0xFF000000u;
         uint trail = _trailArgb;
         double trailAlpha = (trail >> 24) / 255.0;
         int shaded = 0;

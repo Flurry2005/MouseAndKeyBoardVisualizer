@@ -1603,6 +1603,36 @@ public static class SelfTest
         r.Check("auto contrast: dark label on light glass", autoOn < 200 && autoOff > 400, true);
         SavePng(RenderGesture(on, Gesture.Curve, w, h, held).Pixels, w, h, "selftest-cover-colors.png");
 
+        // Auto contrast for the mouse strokes, measured against what is under the mouse area.
+        string dark = WriteSolidImage(dir, "dark.png", 0xFF1A1A1Eu);
+        (double Ratio, uint Trail, uint Outline) StrokeContrast(AppSettings s)
+        {
+            SoftwareRasterizer raster = RenderGesture(s, Gesture.Curve, w, h);
+            double ratio = CoverPalette.ContrastRatio(CoverPalette.RelativeLuminance(raster.EffectiveTrailColor), raster.SwipeBackgroundLuminance);
+            return (ratio, raster.EffectiveTrailColor, raster.EffectiveOutlineColor);
+        }
+
+        var paleOn = StrokeContrast(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0 });
+        var paleOff = StrokeContrast(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0, CoverAutoContrast = false });
+        var paleGlass = StrokeContrast(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0, GlassEnabled = true });
+        var darkOn = StrokeContrast(new AppSettings { BackgroundImagePath = dark, BackgroundFadeMs = 0, TrailColor = "#2A2A30" });
+        var darkOff = StrokeContrast(new AppSettings { BackgroundImagePath = dark, BackgroundFadeMs = 0, TrailColor = "#2A2A30", CoverAutoContrast = false });
+        r.Line(string.Create(CultureInfo.InvariantCulture,
+            $"    stroke contrast: pale cover {paleOn.Ratio:0.0}:1 (off {paleOff.Ratio:0.0}:1, glass {paleGlass.Ratio:0.0}:1), dark cover + dark stroke {darkOn.Ratio:0.0}:1 (off {darkOff.Ratio:0.0}:1)"));
+        r.Line($"    pale cover: stroke 0x{paleOn.Trail:X8}, outline 0x{paleOn.Outline:X8}");
+        r.Check("pale cover: white stroke turned dark enough (≥ 4.5:1)", paleOn.Ratio >= 4.5 && paleOff.Ratio < 3, true);
+        r.Check("stroke and outline stay distinguishable (≥ 2:1)", CoverPalette.ContrastRatio(CoverPalette.RelativeLuminance(paleOn.Outline), CoverPalette.RelativeLuminance(paleOn.Trail)) >= 2, true);
+        r.Check("pale glass cover: stroke readable (≥ 4.5:1)", paleGlass.Ratio >= 4.5, true);
+        r.Check("dark cover: dark stroke turned light enough (≥ 4.5:1)", darkOn.Ratio >= 4.5 && darkOff.Ratio < 3, true);
+        uint paleBorder = RenderGesture(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0 }, null, w, h).Pixels[by * w + bx];
+        uint paleBorderOff = RenderGesture(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0, CoverAutoContrast = false }, null, w, h).Pixels[by * w + bx];
+        double paleLum = CoverPalette.RelativeLuminance(0xFFE4E6F2u);
+        r.Line($"    pale cover key outline: 0x{paleBorder:X8} with auto contrast, 0x{paleBorderOff:X8} without");
+        r.Check("pale cover: key outlines stand out (≥ 3:1)", CoverPalette.ContrastRatio(CoverPalette.RelativeLuminance(paleBorder), paleLum) >= 3
+            && CoverPalette.ContrastRatio(CoverPalette.RelativeLuminance(paleBorderOff), paleLum) < 3, true);
+        SavePng(RenderGesture(new AppSettings { BackgroundImagePath = pale, BackgroundFadeMs = 0, BackgroundImageDim = 0 }, Gesture.Curve, w, h).Pixels,
+            w, h, "selftest-stroke-contrast-pale.png");
+
         const string wallpaper = @"C:\Windows\Web\Wallpaper\Windows\img0.jpg";
         if (File.Exists(wallpaper))
         {

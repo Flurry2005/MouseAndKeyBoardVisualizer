@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.11.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.12.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -263,7 +263,7 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `CoverColorsEnabled` | true | Take colours from the cover / background picture. Spotify's API sends no colours, so the accent (the most prominent saturated colour) is extracted from the image. Grey covers keep the normal colours. |
 | `CoverAccentTrail` / `CoverAccentKeyBorders` | true / true | Accent colour for the mouse strokes (line, arrow, dot) and the key outlines. |
 | `CoverAccentPressedKeys` / `CoverAccentFrameBorders` | false / false | Accent for pressed keys (label turns black/white for contrast) and for the frame and mouse area borders. |
-| `CoverAutoContrast` | true | Accent darkened on light covers and brightened on dark ones; dark key labels on glass over light covers. |
+| `CoverAutoContrast` | true | The mouse strokes (line, arrow, dot) keep at least 4.5:1 contrast against what is under the mouse area: darkened on light covers, lightened on dark ones (hue kept), with the outline flipped when needed. Key outlines keep at least 3:1 against the picture around the keyboard, and glass key labels turn dark on light covers. |
 | `SpotifyRedirectPort` | 8888 | Port of the local sign-in redirect `http://127.0.0.1:PORT/callback`. |
 | `BordersEnabled` | true | Borders on the frame, mouse area and keys (off = borderless). |
 | `FrameEnabled` | true | Draw the panel (the "frame") behind the keyboard and swipe. |

@@ -88,6 +88,59 @@ public readonly record struct CoverPalette(bool HasAccent, uint Accent, uint Acc
         return new CoverPalette(true, accent, Luminance(accent) > 0.5 ? 0xFF141418u : 0xFFFFFFFFu, light);
     }
 
+    /// <summary>WCAG relative luminance (linear light), 0..1.</summary>
+    public static double RelativeLuminance(uint c)
+    {
+        static double Lin(uint v)
+        {
+            double s = v / 255.0;
+            return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Lin((c >> 16) & 0xFF) + 0.7152 * Lin((c >> 8) & 0xFF) + 0.0722 * Lin(c & 0xFF);
+    }
+
+    /// <summary>WCAG contrast ratio between two relative luminances (1..21).</summary>
+    public static double ContrastRatio(double l1, double l2) => (Math.Max(l1, l2) + 0.05) / (Math.Min(l1, l2) + 0.05);
+
+    /// <summary>
+    /// Returns <paramref name="color"/> (alpha kept) made darker on a light background or lighter on a dark one,
+    /// keeping its hue, until it reaches <paramref name="minRatio"/> contrast against
+    /// <paramref name="backgroundLuminance"/> (relative luminance). Unchanged if it already contrasts enough.
+    /// </summary>
+    public static uint EnsureContrast(uint color, double backgroundLuminance, double minRatio = 4.5)
+    {
+        if (ContrastRatio(RelativeLuminance(color), backgroundLuminance) >= minRatio)
+        {
+            return color;
+        }
+
+        uint alpha = color & 0xFF000000u;
+        bool darken = backgroundLuminance > 0.18; // mid-grey or lighter: go dark
+        uint target = darken ? 0xFF000000u : 0xFFFFFFFFu;
+        uint best = target;
+        // Move towards black/white in small steps; the first step with enough contrast keeps most of the hue.
+        for (int step = 1; step <= 20; step++)
+        {
+            double t = step / 20.0;
+            uint c = Mix(color, target, t);
+            if (ContrastRatio(RelativeLuminance(c), backgroundLuminance) >= minRatio)
+            {
+                best = c;
+                break;
+            }
+        }
+
+        return alpha | (best & 0x00FFFFFFu);
+    }
+
+    private static uint Mix(uint a, uint b, double t)
+    {
+        uint Channel(int shift) =>
+            (uint)Math.Clamp(Math.Round(((a >> shift) & 0xFF) * (1 - t) + ((b >> shift) & 0xFF) * t), 0, 255) << shift;
+        return 0xFF000000u | Channel(16) | Channel(8) | Channel(0);
+    }
+
     public static double Luminance(uint c) =>
         (0.2126 * ((c >> 16) & 0xFF) + 0.7152 * ((c >> 8) & 0xFF) + 0.0722 * (c & 0xFF)) / 255.0;
 
