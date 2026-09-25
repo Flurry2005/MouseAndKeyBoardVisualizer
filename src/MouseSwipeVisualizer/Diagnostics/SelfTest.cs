@@ -68,6 +68,7 @@ public static class SelfTest
         report.Line(string.Empty);
 
         report.Run("Interop struct layout", TestStructLayout);
+        report.Run("App icon (Start menu / search)", TestAppIcon);
         report.Run("Settings save/load round trip", TestSettingsRoundTrip);
         report.Run("Settings corrupt JSON fallback", TestSettingsCorrupt);
         report.Run("Settings out-of-range sanitizing", TestSettingsSanitize);
@@ -1639,6 +1640,38 @@ public static class SelfTest
             SavePng(RenderGesture(new AppSettings { BackgroundImagePath = wallpaper, GlassEnabled = true, BackgroundFadeMs = 0 }, Gesture.Curve, w, h, held).Pixels,
                 w, h, "selftest-cover-colors-wallpaper.png");
         }
+    }
+
+    private static void TestAppIcon(Report r)
+    {
+        // The exe's own Win32 icon is what the Start menu, search and Explorer show.
+        string exe = Environment.ProcessPath ?? string.Empty;
+        using System.Drawing.Icon? shellIcon = System.Drawing.Icon.ExtractAssociatedIcon(exe);
+        int opaque = 0, white = 0;
+        if (shellIcon != null)
+        {
+            using System.Drawing.Bitmap bitmap = shellIcon.ToBitmap();
+            for (int y = 0; y < bitmap.Height; y++)
+            {
+                for (int x = 0; x < bitmap.Width; x++)
+                {
+                    System.Drawing.Color c = bitmap.GetPixel(x, y);
+                    if (c.A > 200)
+                    {
+                        opaque++;
+                        if (c.R > 220 && c.G > 220 && c.B > 220)
+                        {
+                            white++;
+                        }
+                    }
+                }
+            }
+        }
+
+        r.Line($"    exe icon: {opaque} opaque pixels, {white} white (arrow)");
+        r.Check("exe has its own icon (dark circle with a white arrow), not the blank default", opaque > 300 && white > 20, true);
+        using Stream? resource = typeof(App).Assembly.GetManifestResourceStream("MouseSwipeVisualizer.AppIcon.ico");
+        r.Check("icon embedded for tray and windows", resource != null && resource.Length > 1000, true);
     }
 
     private static void TestGestureDirections(Report r)

@@ -28,6 +28,9 @@
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Windows 11 (build 22000) is required for the virtual camera; the app itself runs on Windows 10. -->
+    <!-- Icon for the Start menu shortcuts (search) and Settings > Apps. -->
+    <Icon Id="AppIcon.ico" SourceFile="$(var.RepoRoot)src\MouseSwipeVisualizer\Assets\AppIcon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
     <Property Id="ARPCOMMENTS" Value="Mouse swipe visualizer with a native Windows virtual camera (Mouse Swipe Visualizer Camera)." />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -39,9 +42,9 @@
       <Component Id="AppExe" Bitness="always64">
         <File Id="AppExeFile" Source="$(var.PublishDir)MouseSwipeVisualizer.exe" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Mouse Swipe Visualizer"
-                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="AppIcon.ico" />
           <Shortcut Id="StartMenuHeadlessShortcut" Directory="ProgramMenuFolder" Name="Mouse Swipe Visualizer (tray only)"
-                    WorkingDirectory="INSTALLFOLDER" Arguments="--headless" Advertise="yes" />
+                    WorkingDirectory="INSTALLFOLDER" Arguments="--headless" Advertise="yes" Icon="AppIcon.ico" />
         </File>
       </Component>
 

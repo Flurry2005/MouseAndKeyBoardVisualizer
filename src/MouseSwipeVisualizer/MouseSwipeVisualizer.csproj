@@ -14,7 +14,9 @@
     <RootNamespace>MouseSwipeVisualizer</RootNamespace>
     <AssemblyName>MouseSwipeVisualizer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>3.0.12</Version>
+    <!-- Win32 icon of the exe: Start menu, search, Explorer, taskbar. Regenerate with tools/make-icon.ps1. -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Version>3.0.13</Version>
     <!-- Release binaries carry no local build paths. -->
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildProjectDirectory)=/_/src/MouseSwipeVisualizer</PathMap>
@@ -68,6 +70,10 @@
     <Error Condition="'$(VsMSBuild)' == '' or !Exists('$(VsMSBuild)')" Text="Visual Studio MSBuild with the C++ toolset (v143) was not found." />
     <Exec Command="&quot;$(VsMSBuild)&quot; &quot;$(NativeCameraProject)&quot; -nologo -verbosity:minimal -p:Configuration=$(NativeCameraConfiguration) -p:Platform=x64" />
   </Target>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\AppIcon.ico" LogicalName="MouseSwipeVisualizer.AppIcon.ico" />
+  </ItemGroup>
 
   <ItemGroup Condition="'$(SkipNativeBuild)' != 'true'">
     <!-- Kept out of the single-file bundle: the installer copies this file to Program Files for the Frame Server. -->
