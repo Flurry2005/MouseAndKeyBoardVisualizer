@@ -67,10 +67,13 @@ public sealed class SoftwareRasterizer
 
     // Background picture (blurred, dimmed) and a more blurred copy behind glass. Loaded on style change only.
     private bool _imageActive;
+    private bool _imageFillsCanvas; // no frame: the picture replaces the key colour everywhere
     private uint[] _image = Array.Empty<uint>();
     private uint[] _frosted = Array.Empty<uint>();
     private uint[] _scratch = Array.Empty<uint>();
-    private (string Path, DateTime Stamp, int W, int H, double Blur, double Dim, double Frost) _imageKey;
+    private uint[] _areaImage = Array.Empty<uint>();
+    private uint[] _areaFrost = Array.Empty<uint>();
+    private (string Path, DateTime Stamp, int X, int Y, int W, int H, int CW, int CH, double Blur, double Dim, double Frost) _imageKey;
     private string? _imageFailure;
     private uint _glassTint = 0xFFFFFFFFu;
 
@@ -96,7 +99,7 @@ public sealed class SoftwareRasterizer
         _chromaSafe = model.ChromaSafe;
         PrepareStaticLayer(model);
         _static.AsSpan(0, _width * _height).CopyTo(_frame);
-        _hardEdges = _chromaSafe && !_imageActive && model.Style is not ({ FrameEnabled: true } or { SwipeBoxEnabled: true });
+        _hardEdges = _chromaSafe && !_imageFillsCanvas && model.Style is not ({ FrameEnabled: true } or { SwipeBoxEnabled: true });
         LastShadedPixels = 0;
         if (model.IsEmpty || _width == 0 || _height == 0)
         {
@@ -397,10 +400,14 @@ public sealed class SoftwareRasterizer
         if (baseKey != _baseKey)
         {
             int n = _width * _height;
-            _imageActive = style != null && UpdateImage(style);
-            _edgeSafe = _chromaSafe && !_imageActive; // a picture replaces the key colour: nothing to protect
+            // The picture fills the frame panel (replacing its colour); without a frame, the whole image.
+            bool framed = style is { FrameEnabled: true } && !model.Layout.Frame.IsEmpty;
+            RectD imageArea = framed ? model.Layout.Frame : new RectD(0, 0, _width, _height);
+            _imageActive = style != null && UpdateImage(style, imageArea);
+            _imageFillsCanvas = _imageActive && !framed;
+            _edgeSafe = _chromaSafe && !_imageFillsCanvas; // no key colour left: nothing to protect
             _glassTint = (style?.GlassTint ?? 0xFFFFFFFFu) | 0xFF000000u;
-            if (_imageActive)
+            if (_imageFillsCanvas)
             {
                 _image.AsSpan(0, n).CopyTo(_base);
             }
@@ -413,14 +420,15 @@ public sealed class SoftwareRasterizer
             {
                 // The panel edge touches the key colour: hard, 2x2-aligned in chroma-safe mode.
                 FillRoundedRect(_base, model.Layout.Frame, style.FrameCornerRadius, style.FrameBackground,
-                    style.FrameBorder, style.FrameBorderWidth, blockAligned: _edgeSafe, GlassLevel(style, 1));
+                    style.FrameBorder, style.FrameBorderWidth, blockAligned: _edgeSafe, GlassLevel(style, 1), usePicture: true);
             }
 
             if (style is { SwipeBoxEnabled: true } && !model.Layout.SwipeBox.IsEmpty)
             {
                 // Box around the mouse area; only touches the key colour when there is no panel.
                 FillRoundedRect(_base, model.Layout.SwipeBox, style.SwipeBoxCornerRadius, style.SwipeBoxFill,
-                    style.SwipeBoxBorder, style.SwipeBoxBorderWidth, blockAligned: _edgeSafe && !style.FrameEnabled, GlassLevel(style, 1.5));
+                    style.SwipeBoxBorder, style.SwipeBoxBorderWidth, blockAligned: _edgeSafe && !style.FrameEnabled, GlassLevel(style, 1.5),
+                    usePicture: true);
             }
 
             _baseKey = baseKey;
@@ -449,33 +457,45 @@ public sealed class SoftwareRasterizer
     private static double GlassLevel(OverlayStyle style, double layer) =>
         style.Glass ? Math.Clamp(style.GlassOpacity * layer, 0.01, 0.9) : 0;
 
-    /// <summary>Loads/caches the background picture for the current size; false = none or failed (then the plain background).</summary>
-    private bool UpdateImage(OverlayStyle style)
+    /// <summary>
+    /// Loads/caches the background picture, cover-fitted to <paramref name="area"/> (the frame panel) and
+    /// placed there in <see cref="_image"/>/<see cref="_frosted"/>. Blurring stays inside the area, so no
+    /// colour from outside the frame bleeds in. False = none or failed (then the plain colours).
+    /// </summary>
+    private bool UpdateImage(OverlayStyle style, RectD area)
     {
         string path = style.BackgroundImage.Trim().Trim('"');
-        int n = _width * _height;
-        if (path.Length == 0 || n == 0)
+        int ax = Math.Clamp((int)Math.Floor(area.X), 0, _width), ay = Math.Clamp((int)Math.Floor(area.Y), 0, _height);
+        int aw = Math.Clamp((int)Math.Ceiling(area.Right), ax, _width) - ax, ah = Math.Clamp((int)Math.Ceiling(area.Bottom), ay, _height) - ay;
+        if (path.Length == 0 || aw < 2 || ah < 2)
         {
             _imageKey = default;
             _imageFailure = null;
             return false;
         }
 
-        var key = (path, File.GetLastWriteTimeUtc(path), _width, _height, style.ImageBlur, style.ImageDim, style.GlassBlur);
+        var key = (path, File.GetLastWriteTimeUtc(path), ax, ay, aw, ah, _width, _height, style.ImageBlur, style.ImageDim, style.GlassBlur);
         if (key == _imageKey)
         {
             return _imageFailure == null;
         }
 
         _imageKey = key;
+        int n = _width * _height, an = aw * ah;
         if (_image.Length < n)
         {
             _image = new uint[n];
             _frosted = new uint[n];
-            _scratch = new uint[n];
         }
 
-        if (!BackgroundImage.TryLoadCover(path, _width, _height, _image, out string? error))
+        if (_areaImage.Length < an)
+        {
+            _areaImage = new uint[an];
+            _areaFrost = new uint[an];
+            _scratch = new uint[an];
+        }
+
+        if (!BackgroundImage.TryLoadCover(path, aw, ah, _areaImage, out string? error))
         {
             if (error != _imageFailure)
             {
@@ -487,10 +507,16 @@ public sealed class SoftwareRasterizer
         }
 
         _imageFailure = null;
-        BackgroundImage.Blur(_image, _scratch, _width, _height, style.ImageBlur);
-        BackgroundImage.Dim(_image, n, style.ImageDim);
-        _image.AsSpan(0, n).CopyTo(_frosted);
-        BackgroundImage.Blur(_frosted, _scratch, _width, _height, style.GlassBlur);
+        BackgroundImage.Blur(_areaImage, _scratch, aw, ah, style.ImageBlur);
+        BackgroundImage.Dim(_areaImage, an, style.ImageDim);
+        _areaImage.AsSpan(0, an).CopyTo(_areaFrost);
+        BackgroundImage.Blur(_areaFrost, _scratch, aw, ah, style.GlassBlur);
+        for (int y = 0; y < ah; y++)
+        {
+            _areaImage.AsSpan(y * aw, aw).CopyTo(_image.AsSpan((ay + y) * _width + ax, aw));
+            _areaFrost.AsSpan(y * aw, aw).CopyTo(_frosted.AsSpan((ay + y) * _width + ax, aw));
+        }
+
         return true;
     }
 
@@ -527,11 +553,12 @@ public sealed class SoftwareRasterizer
     /// <summary>
     /// Rounded rectangle with border via its signed distance. Anti-aliased, or (blockAligned) decided per
     /// 2x2 block so an edge against the chroma key never shares an NV12 chroma sample with it.
-    /// <paramref name="glass"/> &gt; 0: frosted glass, i.e. the (more blurred) background picture, or
-    /// <paramref name="fill"/> without one, tinted by that amount; the border is half see-through.
+    /// <paramref name="usePicture"/>: the background picture replaces <paramref name="fill"/> (frame, mouse box).
+    /// <paramref name="glass"/> &gt; 0: frosted glass, i.e. the more blurred picture (or <paramref name="fill"/>
+    /// without one) tinted by that amount; the border is half see-through.
     /// </summary>
     private void FillRoundedRect(uint[] target, RectD rect, double radius, uint fill, uint border, double borderWidth, bool blockAligned,
-        double glass = 0)
+        double glass = 0, bool usePicture = false)
     {
         radius = Math.Clamp(radius, 0, Math.Min(rect.Width, rect.Height) / 2);
         double hw = rect.Width / 2, hh = rect.Height / 2, cx = rect.CenterX, cy = rect.CenterY;
@@ -540,11 +567,13 @@ public sealed class SoftwareRasterizer
         fill |= 0xFF000000u;
         border |= 0xFF000000u;
         bool isGlass = glass > 0;
-        uint[] frosted = _frosted;
+        uint[] frosted = _frosted, picture = _image;
         bool image = _imageActive;
+        bool plain = !isGlass && !(image && usePicture);
         uint tint = _glassTint;
 
-        uint FillAt(int i) => isGlass ? Lerp(image ? frosted[i] : fill, tint, glass) : fill;
+        uint Under(int i) => !image ? fill : isGlass ? frosted[i] : usePicture ? picture[i] : fill;
+        uint FillAt(int i) => isGlass ? Lerp(Under(i), tint, glass) : Under(i);
         uint BorderAt(int i) => isGlass ? Lerp(FillAt(i), border, 0.5) : border;
 
         double SignedDistance(double px, double py)
@@ -596,7 +625,7 @@ public sealed class SoftwareRasterizer
                 // Fast path: well inside the straight part, no distance maths needed.
                 if ((dx <= interiorX && dy <= interiorY - radius) || (dy <= interiorY && dx <= interiorX - radius))
                 {
-                    target[row + px] = isGlass ? FillAt(row + px) : fill;
+                    target[row + px] = plain ? fill : FillAt(row + px);
                     continue;
                 }
 

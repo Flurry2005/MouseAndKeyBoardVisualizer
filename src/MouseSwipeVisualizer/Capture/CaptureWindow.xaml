@@ -35,7 +35,7 @@
     <Viewbox Stretch="Uniform">
         <Grid x:Name="Surface" Width="800" Height="800" ClipToBounds="True" UseLayoutRounding="False" Background="#00FF00">
             <!-- Frames come from the window-independent SwipeEngine (same pixels the virtual camera gets). -->
-            <Image x:Name="FrameImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+            <Image x:Name="FrameImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" />
             <!-- Only visible with IncludeDebugInCapture=true (development aid, off by default). -->
             <Border x:Name="DebugPanel"
                     Background="#E0000000"

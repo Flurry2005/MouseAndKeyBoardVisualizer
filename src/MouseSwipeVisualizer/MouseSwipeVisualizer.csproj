@@ -14,7 +14,10 @@
     <RootNamespace>MouseSwipeVisualizer</RootNamespace>
     <AssemblyName>MouseSwipeVisualizer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>3.0.7</Version>
+    <Version>3.0.8</Version>
+    <!-- Release binaries carry no local build paths. -->
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildProjectDirectory)=/_/src/MouseSwipeVisualizer</PathMap>
     <Product>Mouse Swipe Visualizer</Product>
     <Description>Visualizes physical mouse swipes (Raw Input) as a native Windows virtual camera.</Description>
     <!-- No InvariantGlobalization: WPF text input (TextBox) needs real culture data and throws without it. -->

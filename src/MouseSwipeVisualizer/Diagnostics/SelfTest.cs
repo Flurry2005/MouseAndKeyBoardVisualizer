@@ -1285,11 +1285,12 @@ public static class SelfTest
 
         var glass = new AppSettings { BackgroundImagePath = imagePath, GlassEnabled = true };
         uint[] glassPx = RenderGesture(glass, null, w, h).Pixels.ToArray();
-        PixelCensus census = CountPixels(glassPx);
-        r.Check("background image replaces the chroma key", census.Key, 0);
-        int sharpStep = MaxStep(RenderGesture(new AppSettings { BackgroundImagePath = imagePath, BackgroundImageBlur = 0 }, null, w, h).Pixels, w, 2, 600, 680);
-        int blurStep = MaxStep(glassPx, w, 2, 600, 680);
-        r.Line($"    image edge at the top margin: max step {sharpStep} unblurred, {blurStep} blurred");
+        uint outside = glassPx[h / 2 * w + 2] & 0xFFFFFFu;
+        r.Check("outside the frame: still the chroma key", outside, 0x00FF00u);
+        r.Check("inside the frame: the picture instead of the frame colour", Brightness(glassPx[12 * w + 100]) > 90, true);
+        int sharpStep = MaxStep(RenderGesture(new AppSettings { BackgroundImagePath = imagePath, BackgroundImageBlur = 0 }, null, w, h).Pixels, w, 12, 600, 680);
+        int blurStep = MaxStep(glassPx, w, 12, 600, 680);
+        r.Line($"    picture edge inside the frame (top strip): max step {sharpStep} unblurred, {blurStep} blurred");
         r.Check("image covers the canvas (colour edge visible unblurred)", sharpStep > 40, true);
         r.Check("image is blurred", blurStep < 20, true);
 
@@ -1299,8 +1300,8 @@ public static class SelfTest
         uint solid = RenderGesture(new AppSettings { BackgroundImagePath = imagePath }, null, w, h).Pixels[cy * w + cx];
         uint glassy = glassPx[cy * w + cx];
         r.Line($"    mouse box centre: solid 0x{solid:X8}, glass 0x{glassy:X8}");
-        r.Check("glass off: mouse box is its solid colour", solid & 0xFFFFFFu, 0u);
-        r.Check("glass on: mouse box shows the tinted picture", Brightness(glassy) > 120, true);
+        r.Check("glass off: mouse box shows the picture, not its solid colour", Brightness(solid) > 60, true);
+        r.Check("glass on: mouse box is the lighter, tinted picture", Brightness(glassy) > Brightness(solid) + 20, true);
 
         // 4) Borders off: the box edge looks like its inside.
         int ex = (int)layout.SwipeBox.X + 1;
@@ -1325,8 +1326,9 @@ public static class SelfTest
         }
 
         r.Check("picture layer built once for three frames", raster.BaseLayerBuilds, 1);
-        PixelCensus missing = CountPixels(RenderGesture(new AppSettings { BackgroundImagePath = Path.Combine(dir, "missing.png") }, null, w, h).Pixels);
-        r.Check("missing image: plain chroma background, no crash", missing.Key > 0, true);
+        uint missing = RenderGesture(new AppSettings { BackgroundImagePath = Path.Combine(dir, "missing.png") }, null, w, h).Pixels[12 * w + 100];
+        r.Check("missing image: plain frame colour, no crash", missing & 0xFFFFFFu, 0u);
+        SavePng(RenderGesture(new AppSettings { BackgroundImagePath = imagePath, FrameEnabled = false }, null, w, h).Pixels, w, h, "selftest-image-noframe.png");
 
         // Visual samples with a real photo when Windows has its default wallpaper.
         const string wallpaper = @"C:\Windows\Web\Wallpaper\Windows\img0.jpg";

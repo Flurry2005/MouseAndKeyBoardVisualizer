@@ -65,7 +65,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.7.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.8.0-x64.msi`
 
 **VS Code:** öppna mappen, installera rekommenderade tillägg (C# Dev Kit). F5 = kör, *Run Task* har
 `build`, `build installer (MSI)`, `camera: status`, `camera: install / repair (UAC)`, `camera: test`, `self-test`.
@@ -242,7 +242,7 @@ Sparas i `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; äldre f
 | `SwipeBoxFillColor` / `SwipeBoxBorderColor` | `#000000` / `#E6E6E6` | Musytans bakgrund och kant. |
 | `SwipeBoxBorderWidth` / `SwipeBoxCornerRadius` / `SwipeBoxPadding` | 2 / 12 / 10 | Kantbredd, hörnradie och luft mellan kant och swipe (px). |
 | `SwipeBoxWidthPercent` / `SwipeBoxHeightPercent` | 100 / 100 | Musramens bredd/höjd i % av sin yta (20–100, centrerad). Swipen behåller sin storlek och krymper först när ramkanten når den. |
-| `BackgroundImagePath` | tom | Bild bakom allt (ersätter chroma-färgen). Skalas så att den täcker bilden. |
+| `BackgroundImagePath` | tom | Bild i ramen: ersätter ramens och musytans bakgrundsfärg (skalas så att den täcker ramen; utanför ramen är det fortfarande chroma-färgen). Utan ram täcker den hela bilden. |
 | `BackgroundImageBlur` / `BackgroundImageDim` | 24 / 20 | Oskärpa (px) och mörkning (%) av bakgrundsbilden. |
 | `GlassEnabled` | false | Glaslook: ram, musyta och tangenter blir frostat, genomskinligt glas över (en extra suddig kopia av) bakgrundsbilden. Nedtryckta tangenter är solida. |
 | `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glasets ton, tonstyrka (%) och extra frost-oskärpa (px). |
@@ -264,7 +264,8 @@ Precis som för musen: programmet observerar bara, det injicerar eller blockerar
 **Kantutjämning:** allt som ritas på en panel, i musytan eller på en bakgrundsbild är kantutjämnat
 (swipe, kontur, pil, prick, tangenter, ramar). Hårda, 2×2-justerade kanter används bara där något
 direkt möter chroma-färgen (panelens ytterkant, eller swipen när varken ram eller musyta är på), annars
-blir det en grön kant efter keying. Med en bakgrundsbild finns ingen chroma-färg, så allt är utjämnat.
+blir det en grön kant efter keying. Preview-fönstret skalar mjukt, så bilden ser jämn ut även när
+fönstret har en annan storlek än videon eller Windows-skalningen är över 100 %.
 
 Ramen och tangentbordet ritas i ett cachat statiskt lager: bakgrund + ram byggs om bara när stil eller
 storlek ändras, tangentbordet bara när en tangent går upp/ner. Kanterna är 2×2-blockjusterade i
