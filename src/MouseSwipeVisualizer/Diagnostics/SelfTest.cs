@@ -89,6 +89,7 @@ public static class SelfTest
         report.Run("Keyboard panel + frame: 40/60 split, key presses, static layer cache, chroma-safe", TestKeyboardPanel);
         report.Run("Anti-aliasing, background image, glass look, borders off", TestGlassAndAntiAliasing);
         await report.RunAsync("Spotify cover art: secrets, parsing, callback, background override", TestSpotifyAsync);
+        report.Run("Cover colours: accent for strokes and key outlines, auto contrast", TestCoverColors);
         await report.RunAsync("Headless engine: preview visible/covered/minimized/hidden/closed", TestHeadlessEngineAsync);
         await report.RunAsync("Preview capture while occluded and unfocused (PrintWindow)", TestOccludedCaptureAsync);
         await report.RunAsync("Rendering cost", TestRenderingCostAsync);
@@ -1498,6 +1499,116 @@ public static class SelfTest
         string message = await service.ConnectAsync("", null);
         r.Check("connect without client ID is refused before opening a browser", message.Contains("Client ID"), true, message);
         service.Dispose();
+    }
+
+    /// <summary>Solid picture with a little grey noise (for cover colour tests).</summary>
+    private static string WriteSolidImage(string dir, string name, uint color)
+    {
+        string path = Path.Combine(dir, name);
+        var px = new uint[320 * 180];
+        var random = new Random(7);
+        for (int i = 0; i < px.Length; i++)
+        {
+            px[i] = random.Next(10) == 0 ? 0xFF808080u : color;
+        }
+
+        using FileStream file = File.Create(path);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(320, 180, 96, 96, PixelFormats.Bgra32, null, px, 320 * 4)));
+        encoder.Save(file);
+        return path;
+    }
+
+    private static void TestCoverColors(Report r)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "MouseSwipeVisualizer-selftest", "colors");
+        Directory.CreateDirectory(dir);
+        string blue = WriteSolidImage(dir, "blue.png", 0xFF2050D0u);
+        string grey = WriteSolidImage(dir, "grey.png", 0xFF606060u);
+        string pale = WriteSolidImage(dir, "pale.png", 0xFFE4E6F2u);
+        const int w = 1280, h = 720;
+        static bool Bluish(uint p) => (p & 0xFF) > ((p >> 16) & 0xFF) + 40;
+
+        // Palette extraction.
+        CoverPalette bp = CoverPalette.Extract(new uint[] { 0xFF2050D0u, 0xFF2050D0u, 0xFF808080u }, 1, true);
+        r.Check("blue cover → blue accent", bp.HasAccent && Bluish(bp.Accent), true, $"0x{bp.Accent:X8}");
+        CoverPalette gp = CoverPalette.Extract(new uint[] { 0xFF606060u, 0xFF707070u, 0xFF505050u }, 1, true);
+        r.Check("grey cover → no accent", gp.HasAccent, false);
+        CoverPalette lp = CoverPalette.Extract(new uint[] { 0xFFF0F0F0u, 0xFFE8E8F8u, 0xFF3060E0u }, 1, true);
+        r.Check("light cover: light, accent darkened for contrast", lp.Light && lp.HasAccent && CoverPalette.Luminance(lp.Accent) < 0.4, true, $"0x{lp.Accent:X8}");
+
+        // Mouse strokes take the accent.
+        var held = new KeyboardState();
+        held.OnKey(0x11, true);
+        (uint[] still, uint[] drawn) Pair(AppSettings s) =>
+            (RenderGesture(s, null, w, h, held).Pixels.ToArray(), RenderGesture(s, Gesture.Curve, w, h, held).Pixels.ToArray());
+        int BluishStrokePixels(AppSettings s)
+        {
+            (uint[] a, uint[] b) = Pair(s);
+            int n = 0;
+            for (int i = 0; i < b.Length; i++)
+            {
+                if (a[i] != b[i] && Bluish(b[i]))
+                {
+                    n++;
+                }
+            }
+
+            return n;
+        }
+
+        var on = new AppSettings { BackgroundImagePath = blue, BackgroundFadeMs = 0 };
+        var off = new AppSettings { BackgroundImagePath = blue, BackgroundFadeMs = 0, CoverColorsEnabled = false };
+        int strokesOn = BluishStrokePixels(on), strokesOff = BluishStrokePixels(off);
+        r.Line($"    blue cover: {strokesOn} blue stroke pixels with cover colours, {strokesOff} without");
+        r.Check("mouse strokes use the cover accent", strokesOn > 500, true);
+        r.Check("cover colours off: strokes keep their own colour (only edges blend with the blue picture)", strokesOn > 3 * strokesOff, true);
+
+        // Key outlines take the accent; pressed-key fill only when asked.
+        OverlayLayout layout = OverlayLayout.Compute(w, h, OverlayStyle.From(on));
+        var keys = new RectD[KeyboardLayout.Keys.Count];
+        OverlayLayout.ComputeKeys(layout.Keyboard, keys, out _, layout.KeyUnit);
+        RectD q = keys[KeyboardLayout.KeyIndexForScanCode(0x10)], wKey = keys[KeyboardLayout.KeyIndexForScanCode(0x11)];
+        int bx = (int)q.X + 1, by = (int)q.CenterY;
+        uint BorderOf(AppSettings s) => RenderGesture(s, null, w, h, held).Pixels[by * w + bx];
+        uint PressedFillOf(AppSettings s) => RenderGesture(s, null, w, h, held).Pixels[(int)(wKey.Y + wKey.Height * 0.2) * w + (int)(wKey.X + wKey.Width * 0.2)];
+        uint borderOn = BorderOf(on), borderOff = BorderOf(off), borderGrey = BorderOf(new AppSettings { BackgroundImagePath = grey, BackgroundFadeMs = 0 });
+        r.Line($"    Q outline: 0x{borderOn:X8} with cover colours, 0x{borderOff:X8} without, 0x{borderGrey:X8} on a grey cover");
+        r.Check("key outlines use the cover accent", Bluish(borderOn), true);
+        r.Check("cover colours off / grey cover: normal outline colour", !Bluish(borderOff) && !Bluish(borderGrey), true);
+        uint pressedDefault = PressedFillOf(on);
+        uint pressedAccent = PressedFillOf(new AppSettings { BackgroundImagePath = blue, BackgroundFadeMs = 0, CoverAccentPressedKeys = true });
+        r.Check("pressed keys: white by default, accent when enabled", (pressedDefault & 0xFFFFFFu) == 0xFFFFFFu && Bluish(pressedAccent), true,
+            $"0x{pressedDefault:X8} 0x{pressedAccent:X8}");
+
+        // Auto contrast: dark labels on glass keys over a light cover.
+        int DarkestInKey(AppSettings s)
+        {
+            ReadOnlySpan<uint> px = RenderGesture(s, null, w, h).Pixels;
+            int min = int.MaxValue;
+            for (int y = (int)(q.Y + q.Height * 0.3); y < (int)(q.Y + q.Height * 0.7); y++)
+            {
+                for (int x = (int)(q.X + q.Width * 0.3); x < (int)(q.X + q.Width * 0.7); x++)
+                {
+                    min = Math.Min(min, Brightness(px[y * w + x]));
+                }
+            }
+
+            return min;
+        }
+
+        int autoOn = DarkestInKey(new AppSettings { BackgroundImagePath = pale, GlassEnabled = true, BackgroundFadeMs = 0, BackgroundImageDim = 0 });
+        int autoOff = DarkestInKey(new AppSettings { BackgroundImagePath = pale, GlassEnabled = true, BackgroundFadeMs = 0, BackgroundImageDim = 0, CoverAutoContrast = false });
+        r.Line($"    light glass Q key, darkest pixel: {autoOn} with auto contrast, {autoOff} without");
+        r.Check("auto contrast: dark label on light glass", autoOn < 200 && autoOff > 400, true);
+        SavePng(RenderGesture(on, Gesture.Curve, w, h, held).Pixels, w, h, "selftest-cover-colors.png");
+
+        const string wallpaper = @"C:\Windows\Web\Wallpaper\Windows\img0.jpg";
+        if (File.Exists(wallpaper))
+        {
+            SavePng(RenderGesture(new AppSettings { BackgroundImagePath = wallpaper, GlassEnabled = true, BackgroundFadeMs = 0 }, Gesture.Curve, w, h, held).Pixels,
+                w, h, "selftest-cover-colors-wallpaper.png");
+        }
     }
 
     private static void TestGestureDirections(Report r)

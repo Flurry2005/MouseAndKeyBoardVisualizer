@@ -244,6 +244,24 @@ public sealed class AppSettings
     /// <summary>Crossfade (ms) when the picture changes, e.g. a new Spotify cover. 0 = switch instantly.</summary>
     public double BackgroundFadeMs { get; set; } = DefaultBackgroundFadeMs;
 
+    /// <summary>Take colours from the picture / Spotify cover (Spotify's API has none, so they are extracted locally).</summary>
+    public bool CoverColorsEnabled { get; set; } = true;
+
+    /// <summary>Accent colour for the mouse strokes (line, arrow, dot).</summary>
+    public bool CoverAccentTrail { get; set; } = true;
+
+    /// <summary>Accent colour for the key outlines.</summary>
+    public bool CoverAccentKeyBorders { get; set; } = true;
+
+    /// <summary>Accent colour as the fill of pressed keys (label picks black/white for contrast).</summary>
+    public bool CoverAccentPressedKeys { get; set; }
+
+    /// <summary>Accent colour for the frame and mouse area borders.</summary>
+    public bool CoverAccentFrameBorders { get; set; }
+
+    /// <summary>Dark key labels on glass over a light picture; accent darkened on light, brightened on dark pictures.</summary>
+    public bool CoverAutoContrast { get; set; } = true;
+
     /// <summary>Borders on frame, mouse box and keys.</summary>
     public bool BordersEnabled { get; set; } = true;
 

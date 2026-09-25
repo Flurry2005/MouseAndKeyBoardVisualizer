@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.10.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.11.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -260,6 +260,10 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `SpotifyClientId` | empty | Client ID of your own Spotify app. The client secret is **not** stored in settings.json. |
 | `SpotifyPollSeconds` | 3 | How often to check what's playing (1–60 s); the cover changes within this time after a song change. |
 | `BackgroundFadeMs` | 600 | Crossfade (ms, 0–5000) when the cover or background picture changes; 0 = switch instantly. |
+| `CoverColorsEnabled` | true | Take colours from the cover / background picture. Spotify's API sends no colours, so the accent (the most prominent saturated colour) is extracted from the image. Grey covers keep the normal colours. |
+| `CoverAccentTrail` / `CoverAccentKeyBorders` | true / true | Accent colour for the mouse strokes (line, arrow, dot) and the key outlines. |
+| `CoverAccentPressedKeys` / `CoverAccentFrameBorders` | false / false | Accent for pressed keys (label turns black/white for contrast) and for the frame and mouse area borders. |
+| `CoverAutoContrast` | true | Accent darkened on light covers and brightened on dark ones; dark key labels on glass over light covers. |
 | `SpotifyRedirectPort` | 8888 | Port of the local sign-in redirect `http://127.0.0.1:PORT/callback`. |
 | `BordersEnabled` | true | Borders on the frame, mouse area and keys (off = borderless). |
 | `FrameEnabled` | true | Draw the panel (the "frame") behind the keyboard and swipe. |
@@ -287,6 +291,8 @@ Setup (once):
    approve access in the browser that opens.
 4. Tick **Use the cover of what's playing on Spotify** and choose how often to check (**Check every … s**, default 3)
    and how long the crossfade to a new cover takes (**Cover fade (ms)**, default 600; 0 = instant).
+5. Optional: **Use colours from the cover** tints the mouse strokes and key outlines (and, if ticked, pressed keys
+   and frame borders) with the cover's accent colour. The colours crossfade together with the cover.
 
 Apps in Spotify's development mode only work for their owner and for users you add under *User Management* in the
 dashboard.

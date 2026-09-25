@@ -59,7 +59,12 @@ public sealed record OverlayStyle(
     double GlassOpacity = 0.12,
     double GlassBlur = 0,
     bool Borders = true,
-    double ImageFadeMs = 0)
+    double ImageFadeMs = 0,
+    bool AccentTrail = false,
+    bool AccentKeyBorders = false,
+    bool AccentPressedKeys = false,
+    bool AccentFrameBorders = false,
+    bool AutoContrast = false)
 {
     public static OverlayStyle From(AppSettings s)
     {
@@ -84,7 +89,12 @@ public sealed record OverlayStyle(
             s.FrameWidthPercent / 100.0, s.FrameHeightPercent / 100.0,
             s.BackgroundImagePath ?? string.Empty, s.BackgroundImageBlur, s.BackgroundImageDim / 100.0,
             s.GlassEnabled, Argb(s.GlassTintColor, System.Windows.Media.Colors.White), s.GlassOpacity / 100.0, s.GlassBlur,
-            s.BordersEnabled, s.BackgroundFadeMs);
+            s.BordersEnabled, s.BackgroundFadeMs,
+            s.CoverColorsEnabled && s.CoverAccentTrail,
+            s.CoverColorsEnabled && s.CoverAccentKeyBorders,
+            s.CoverColorsEnabled && s.CoverAccentPressedKeys,
+            s.CoverColorsEnabled && s.CoverAccentFrameBorders,
+            s.CoverColorsEnabled && s.CoverAutoContrast);
     }
 }
 

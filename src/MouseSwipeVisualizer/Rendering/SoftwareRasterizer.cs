@@ -73,7 +73,8 @@ public sealed class SoftwareRasterizer
     private uint[] _scratch = Array.Empty<uint>();
     private uint[] _areaImage = Array.Empty<uint>();
     private uint[] _areaFrost = Array.Empty<uint>();
-    private (string Path, DateTime Stamp, int X, int Y, int W, int H, int CW, int CH, double Blur, double Dim, double Frost) _imageKey;
+    private (string Path, DateTime Stamp, int X, int Y, int W, int H, int CW, int CH, double Blur, double Dim, double Frost,
+        bool Adapt) _imageKey;
     private string? _imageFailure;
     private uint _glassTint = 0xFFFFFFFFu;
 
@@ -85,6 +86,11 @@ public sealed class SoftwareRasterizer
     private long _fadeTicks;
     private double _fadeT;
 
+    // Colours from the picture/cover and the effective colours of this frame (fade with the picture).
+    private CoverPalette _palette;
+    private OverlayStyle? _drawStyle;
+    private uint _trailArgb, _dotArgb, _lastTrail, _lastDot, _trailFrom, _dotFrom;
+
     public int Width => _width;
 
     public int Height => _height;
@@ -94,6 +100,12 @@ public sealed class SoftwareRasterizer
 
     /// <summary>Pixels whose colour was computed from shapes in the last frame (diagnostics).</summary>
     public int LastShadedPixels { get; private set; }
+
+    /// <summary>Accent colour taken from the current picture/cover, if it has one (diagnostics, self-test).</summary>
+    public uint? CoverAccent => _imageActive && _palette.HasAccent ? _palette.Accent : null;
+
+    /// <summary>The current picture/cover is light overall.</summary>
+    public bool CoverIsLight => _imageActive && _palette.Light;
 
     /// <summary>True while the picture crossfade runs: the caller must keep rendering frames until it ends.</summary>
     public bool IsAnimating => _fading;
@@ -110,6 +122,7 @@ public sealed class SoftwareRasterizer
         _chromaSafe = model.ChromaSafe;
         PrepareStaticLayer(model);
         ComposeStatic(model.Now);
+        UpdateSwipeColors(model);
         _hardEdges = _chromaSafe && !_imageFillsCanvas && model.Style is not ({ FrameEnabled: true } or { SwipeBoxEnabled: true });
         LastShadedPixels = 0;
         if (model.IsEmpty || _width == 0 || _height == 0)
@@ -149,7 +162,7 @@ public sealed class SoftwareRasterizer
         ReadOnlySpan<double> dots = model.Dots;
         for (int i = 0; i < dots.Length; i += SwipeRenderModel.DotStride)
         {
-            RasterDot(dots[i], dots[i + 1], dots[i + 2], dots[i + 3], model.DotColor | 0xFF000000u);
+            RasterDot(dots[i], dots[i + 1], dots[i + 2], dots[i + 3], _dotArgb);
         }
 
         ReadOnlySpan<double> arrows = model.Arrows;
@@ -429,6 +442,8 @@ public sealed class SoftwareRasterizer
                 _imageIdentity = identity;
             }
             _edgeSafe = _chromaSafe && !_imageFillsCanvas; // no key colour left: nothing to protect
+            _drawStyle = ApplyPalette(style);
+            style = _drawStyle;
             _glassTint = (style?.GlassTint ?? 0xFFFFFFFFu) | 0xFF000000u;
             if (_imageFillsCanvas)
             {
@@ -467,13 +482,78 @@ public sealed class SoftwareRasterizer
         }
 
         _base.AsSpan(0, _width * _height).CopyTo(_static);
-        if (style is { KeyboardEnabled: true } && !model.Layout.Keyboard.IsEmpty)
+        OverlayStyle? keyStyle = _drawStyle ?? style;
+        if (keyStyle is { KeyboardEnabled: true } && !model.Layout.Keyboard.IsEmpty)
         {
-            DrawKeyboard(model, style);
+            DrawKeyboard(model, keyStyle);
         }
 
         _staticKey = staticKey;
         KeyboardLayerBuilds++;
+    }
+
+    /// <summary>Style with the picture's colours applied (accent on the chosen parts, contrast-safe labels).</summary>
+    private OverlayStyle? ApplyPalette(OverlayStyle? style)
+    {
+        if (style == null || !_imageActive)
+        {
+            return style;
+        }
+
+        OverlayStyle s = style;
+        if (_palette.HasAccent)
+        {
+            if (s.AccentKeyBorders)
+            {
+                s = s with { KeyBorder = _palette.Accent };
+            }
+
+            if (s.AccentPressedKeys)
+            {
+                s = s with { KeyPressedFill = _palette.Accent, KeyPressedLabel = _palette.AccentText };
+            }
+
+            if (s.AccentFrameBorders)
+            {
+                s = s with { FrameBorder = _palette.Accent, SwipeBoxBorder = _palette.Accent };
+            }
+        }
+
+        if (s is { AutoContrast: true, Glass: true } && _palette.Light)
+        {
+            s = s with { KeyLabel = 0xFF141418u }; // white labels would vanish on light glass
+        }
+
+        return s;
+    }
+
+    /// <summary>Stroke/dot colours for this frame: accent from the cover if enabled, crossfaded with the picture.</summary>
+    private void UpdateSwipeColors(SwipeRenderModel model)
+    {
+        uint trail = model.TrailColor, dot = model.DotColor | 0xFF000000u;
+        if (_imageActive && _palette.HasAccent && model.Style is { AccentTrail: true })
+        {
+            trail = _palette.Accent;
+            dot = _palette.Accent;
+        }
+
+        if (_fading)
+        {
+            trail = LerpArgb(_trailFrom, trail, _fadeT);
+            dot = LerpArgb(_dotFrom, dot, _fadeT);
+        }
+
+        _trailArgb = trail;
+        _dotArgb = dot;
+        _lastTrail = trail;
+        _lastDot = dot;
+    }
+
+    private static uint LerpArgb(uint from, uint to, double t)
+    {
+        uint Channel(int shift) =>
+            (uint)Math.Clamp(Math.Round(((from >> shift) & 0xFF) * (1 - t) + ((to >> shift) & 0xFF) * t), 0, 255) << shift;
+        return Channel(24) | Channel(16) | Channel(8) | Channel(0);
     }
 
     /// <summary>Remembers what is on screen now (mid-fade: the current blend) as the start of a new crossfade.</summary>
@@ -494,6 +574,8 @@ public sealed class SoftwareRasterizer
             _static.AsSpan(0, n).CopyTo(_fadeFrom);
         }
 
+        _trailFrom = _lastTrail;
+        _dotFrom = _lastDot;
         _fading = true;
         _fadeStart = now;
         _fadeTicks = Math.Max(1, Utilities.MonotonicClock.MsToTicks(ms));
@@ -558,10 +640,12 @@ public sealed class SoftwareRasterizer
         {
             _imageKey = default;
             _imageFailure = null;
+            _palette = default;
             return false;
         }
 
-        var key = (path, File.GetLastWriteTimeUtc(path), ax, ay, aw, ah, _width, _height, style.ImageBlur, style.ImageDim, style.GlassBlur);
+        var key = (path, File.GetLastWriteTimeUtc(path), ax, ay, aw, ah, _width, _height, style.ImageBlur, style.ImageDim, style.GlassBlur,
+            style.AutoContrast);
         if (key == _imageKey)
         {
             return _imageFailure == null;
@@ -590,12 +674,14 @@ public sealed class SoftwareRasterizer
             }
 
             _imageFailure = error ?? "unknown error";
+            _palette = default;
             return false;
         }
 
         _imageFailure = null;
         BackgroundImage.Blur(_areaImage, _scratch, aw, ah, style.ImageBlur);
         BackgroundImage.Dim(_areaImage, an, style.ImageDim);
+        _palette = CoverPalette.Extract(_areaImage.AsSpan(0, an), 7, adaptToBackground: style.AutoContrast);
         _areaImage.AsSpan(0, an).CopyTo(_areaFrost);
         BackgroundImage.Blur(_areaFrost, _scratch, aw, ah, style.GlassBlur);
         for (int y = 0; y < ah; y++)
@@ -802,7 +888,7 @@ public sealed class SoftwareRasterizer
         }
 
         uint outlineColor = model.OutlineColor | 0xFF000000u;
-        uint trail = model.TrailColor;
+        uint trail = _trailArgb;
         double trailAlpha = (trail >> 24) / 255.0;
         int shaded = 0;
 

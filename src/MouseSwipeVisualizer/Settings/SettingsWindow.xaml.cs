@@ -425,6 +425,12 @@ public partial class SettingsWindow : Window
         BindCheck(SpotifyCheck, () => _host.Settings.SpotifyCoverEnabled, v => _host.Settings.SpotifyCoverEnabled = v);
         BindSlider(SpotifyPollSlider, SpotifyPollBox, () => _host.Settings.SpotifyPollSeconds, v => _host.Settings.SpotifyPollSeconds = v,
             AppSettings.MinSpotifyPollSeconds, AppSettings.MaxSpotifyPollSeconds, "0");
+        BindCheck(CoverColorsCheck, () => _host.Settings.CoverColorsEnabled, v => _host.Settings.CoverColorsEnabled = v);
+        BindCheck(AccentTrailCheck, () => _host.Settings.CoverAccentTrail, v => _host.Settings.CoverAccentTrail = v);
+        BindCheck(AccentKeyBordersCheck, () => _host.Settings.CoverAccentKeyBorders, v => _host.Settings.CoverAccentKeyBorders = v);
+        BindCheck(AccentPressedCheck, () => _host.Settings.CoverAccentPressedKeys, v => _host.Settings.CoverAccentPressedKeys = v);
+        BindCheck(AccentFrameBordersCheck, () => _host.Settings.CoverAccentFrameBorders, v => _host.Settings.CoverAccentFrameBorders = v);
+        BindCheck(AutoContrastCheck, () => _host.Settings.CoverAutoContrast, v => _host.Settings.CoverAutoContrast = v);
         BindSlider(BgFadeSlider, BgFadeBox, () => _host.Settings.BackgroundFadeMs, v => _host.Settings.BackgroundFadeMs = v,
             0, AppSettings.MaxBackgroundFadeMs, "0");
 

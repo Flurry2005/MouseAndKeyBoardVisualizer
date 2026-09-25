@@ -282,7 +282,7 @@
                     <ColumnDefinition Width="80" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
                 <CheckBox x:Name="SpotifyCheck" Grid.ColumnSpan="3" Content="Use the cover of what's playing on Spotify as the frame background" />
@@ -305,13 +305,24 @@
                 <Slider x:Name="BgFadeSlider" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="5000" SmallChange="50" LargeChange="250"
                         ToolTip="Crossfade when the cover (or background picture) changes. 0 = switch instantly." />
                 <TextBox x:Name="BgFadeBox" Grid.Row="6" Grid.Column="2" />
-                <StackPanel Grid.Row="7" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
+                <CheckBox x:Name="CoverColorsCheck" Grid.Row="7" Grid.ColumnSpan="3" Margin="0,6,0,2"
+                          Content="Use colours from the cover (also for a background picture):"
+                          ToolTip="Spotify sends no colours; the accent is taken from the cover image itself." />
+                <WrapPanel Grid.Row="8" Grid.ColumnSpan="3" Margin="18,0,0,2">
+                    <CheckBox x:Name="AccentTrailCheck" Content="Mouse strokes" Margin="0,0,12,0" />
+                    <CheckBox x:Name="AccentKeyBordersCheck" Content="Key outlines" Margin="0,0,12,0" />
+                    <CheckBox x:Name="AccentPressedCheck" Content="Pressed keys" Margin="0,0,12,0" />
+                    <CheckBox x:Name="AccentFrameBordersCheck" Content="Frame borders" Margin="0,0,12,0" />
+                    <CheckBox x:Name="AutoContrastCheck" Content="Auto contrast"
+                              ToolTip="Darker accent and dark key labels on light covers, brighter accent on dark covers." />
+                </WrapPanel>
+                <StackPanel Grid.Row="9" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
                     <Button x:Name="SpotifyConnectButton" Content="Connect Spotify…" Padding="10,2" />
                     <Button x:Name="SpotifyDisconnectButton" Content="Disconnect" Padding="10,2" Margin="6,0,0,0"
                             ToolTip="Forget the saved client secret and sign-in" />
                 </StackPanel>
-                <TextBlock x:Name="SpotifyStatusText" Grid.Row="8" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" />
-                <TextBlock x:Name="SpotifySecretHint" Grid.Row="9" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.7" />
+                <TextBlock x:Name="SpotifyStatusText" Grid.Row="10" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" />
+                <TextBlock x:Name="SpotifySecretHint" Grid.Row="11" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.7" />
             </Grid>
         </GroupBox>
 
