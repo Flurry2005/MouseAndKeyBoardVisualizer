@@ -32,7 +32,7 @@ namespace MouseSwipeVisualizer.Rendering;
 /// </para>
 /// All buffers are persistent; rendering a frame does not allocate.
 /// </summary>
-public sealed class SoftwareRasterizer
+public sealed partial class SoftwareRasterizer
 {
     private const double ChromaSafeMinWidthRatio = 0.3;
     private const double NormalOutlineMaxAlpha = 0.55;
@@ -110,7 +110,7 @@ public sealed class SoftwareRasterizer
     public bool CoverIsLight => _imageActive && _palette.Light;
 
     /// <summary>True while the picture crossfade runs: the caller must keep rendering frames until it ends.</summary>
-    public bool IsAnimating => _fading;
+    public bool IsAnimating => _fading || _npAnimating;
 
     /// <summary>How often the background + frame layer was rebuilt (diagnostics; style/size changes only).</summary>
     public int BaseLayerBuilds { get; private set; }
@@ -125,6 +125,7 @@ public sealed class SoftwareRasterizer
         PrepareStaticLayer(model);
         ComposeStatic(model.Now);
         UpdateSwipeColors(model);
+        DrawNowPlaying(model);
         _hardEdges = _chromaSafe && !_imageFillsCanvas && model.Style is not ({ FrameEnabled: true } or { SwipeBoxEnabled: true });
         LastShadedPixels = 0;
         if (model.IsEmpty || _width == 0 || _height == 0)

@@ -13,6 +13,13 @@ public enum HeadStyle
 }
 
 /// <summary>Where the keyboard panel sits relative to the swipe area.</summary>
+public enum NowPlayingCoverStyle
+{
+    Square,
+    Vinyl,
+    None,
+}
+
 public enum KeyboardPosition
 {
     Left,
@@ -85,6 +92,7 @@ public sealed class AppSettings
     public const double MinDotSize = 2, MaxDotSize = 48, DefaultDotSize = 12;
     public const int MinKeyboardSplit = 20, MaxKeyboardSplit = 70, DefaultKeyboardSplit = 40;
     public const double MinSwipeBoxPercent = 20, MaxSwipeBoxPercent = 100;
+    public const double MinNowPlayingHeight = 10, MaxNowPlayingHeight = 50, MinNowPlayingWidth = 30, MaxNowPlayingSpacing = 80;
     public const double MinSpotifyPollSeconds = 1, MaxSpotifyPollSeconds = 300, DefaultSpotifyPollSeconds = 15;
     public const int DefaultSpotifyPort = 8888;
     public const double MaxBackgroundFadeMs = 5000, DefaultBackgroundFadeMs = 600;
@@ -285,6 +293,27 @@ public sealed class AppSettings
     /// <summary>Port of the local OAuth redirect: http://127.0.0.1:PORT/callback.</summary>
     public int SpotifyRedirectPort { get; set; } = DefaultSpotifyPort;
 
+    // ------------------------------------------------------------------ now playing card
+
+    /// <summary>Card with what is playing on Spotify, under the keyboard and mouse area.</summary>
+    public bool NowPlayingEnabled { get; set; }
+
+    /// <summary>Card height in % of the content height (the keyboard and mouse area make room).</summary>
+    public double NowPlayingHeightPercent { get; set; } = 24;
+
+    /// <summary>Card width in % of the content width, centred.</summary>
+    public double NowPlayingWidthPercent { get; set; } = 100;
+
+    /// <summary>Space between the keyboard/mouse area and the card (px).</summary>
+    public double NowPlayingSpacing { get; set; } = 12;
+
+    public NowPlayingCoverStyle NowPlayingCover { get; set; } = NowPlayingCoverStyle.Square;
+
+    /// <summary>Colours from the cover (like Amuse's "magic colors"); otherwise <see cref="NowPlayingTintColor"/>.</summary>
+    public bool NowPlayingMagicColors { get; set; } = true;
+
+    public string NowPlayingTintColor { get; set; } = "#FFFFFF";
+
     // ------------------------------------------------------------------ output
 
     /// <summary>Primary output. The camera is the default; the OBS window stays as a fallback.</summary>
@@ -368,6 +397,14 @@ public sealed class AppSettings
         SwipeBoxPadding = Clamp(nameof(SwipeBoxPadding), SwipeBoxPadding, 0, MaxFramePadding, 10, fixes);
         BackgroundImagePath = BackgroundImagePath?.Trim().Trim('"') ?? string.Empty;
         SpotifyClientId = SpotifyClientId?.Trim() ?? string.Empty;
+        NowPlayingHeightPercent = Clamp(nameof(NowPlayingHeightPercent), NowPlayingHeightPercent, MinNowPlayingHeight, MaxNowPlayingHeight, 24, fixes);
+        NowPlayingWidthPercent = Clamp(nameof(NowPlayingWidthPercent), NowPlayingWidthPercent, MinNowPlayingWidth, 100, 100, fixes);
+        NowPlayingSpacing = Clamp(nameof(NowPlayingSpacing), NowPlayingSpacing, 0, MaxNowPlayingSpacing, 12, fixes);
+        NowPlayingTintColor = ValidColor(nameof(NowPlayingTintColor), NowPlayingTintColor, "#FFFFFF", fixes);
+        if (!Enum.IsDefined(NowPlayingCover))
+        {
+            NowPlayingCover = NowPlayingCoverStyle.Square;
+        }
         BackgroundFadeMs = Clamp(nameof(BackgroundFadeMs), BackgroundFadeMs, 0, MaxBackgroundFadeMs, DefaultBackgroundFadeMs, fixes);
         SpotifyPollSeconds = Clamp(nameof(SpotifyPollSeconds), SpotifyPollSeconds, MinSpotifyPollSeconds, MaxSpotifyPollSeconds, DefaultSpotifyPollSeconds, fixes);
         if (SpotifyRedirectPort is < 1024 or > 65535)

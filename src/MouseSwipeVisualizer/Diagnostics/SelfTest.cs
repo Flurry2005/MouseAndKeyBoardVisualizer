@@ -97,6 +97,7 @@ public static class SelfTest
         report.Run("Anti-aliasing, background image, glass look, borders off", TestGlassAndAntiAliasing);
         await report.RunAsync("Spotify cover art: secrets, parsing, callback, background override", TestSpotifyAsync);
         report.Run("Cover colours: accent for strokes and key outlines, auto contrast", TestCoverColors);
+        report.Run("Now playing card: layout, palette, progress, vinyl", TestNowPlayingCard);
         await report.RunAsync("Headless engine: preview visible/covered/minimized/hidden/closed", TestHeadlessEngineAsync);
         await report.RunAsync("Preview capture while occluded and unfocused (PrintWindow)", TestOccludedCaptureAsync);
         await report.RunAsync("Rendering cost", TestRenderingCostAsync);
@@ -1722,6 +1723,170 @@ public static class SelfTest
         r.Check("exe has its own icon (dark circle with a white arrow), not the blank default", opaque > 300 && white > 20, true);
         using Stream? resource = typeof(App).Assembly.GetManifestResourceStream("MouseSwipeVisualizer.AppIcon.ico");
         r.Check("icon embedded for tray and windows", resource != null && resource.Length > 1000, true);
+    }
+
+    /// <summary>Cover-like test picture: mostly teal with a pink subject (like the "Rip It" cover).</summary>
+    private static string WriteCoverImage(string dir)
+    {
+        string path = Path.Combine(dir, "cover.png");
+        const int n = 300;
+        var px = new uint[n * n];
+        for (int y = 0; y < n; y++)
+        {
+            for (int x = 0; x < n; x++)
+            {
+                double d = Math.Sqrt((x - 170) * (x - 170) + (y - 120) * (y - 120));
+                px[y * n + x] = d < 70 ? 0xFFE8457Au : ((x / 20 + y / 20) % 2 == 0 ? 0xFF2F6F6Au : 0xFF1F4A48u);
+            }
+        }
+
+        using FileStream file = File.Create(path);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(n, n, 96, 96, PixelFormats.Bgra32, null, px, n * 4)));
+        encoder.Save(file);
+        return path;
+    }
+
+    private static void TestNowPlayingCard(Report r)
+    {
+        const int w = 1280, h = 720;
+        string dir = Path.Combine(Path.GetTempPath(), "MouseSwipeVisualizer-selftest", "nowplaying");
+        Directory.CreateDirectory(dir);
+        string coverPath = WriteCoverImage(dir);
+
+        // Layout: a strip at the bottom; keyboard and mouse area above it with the spacing between.
+        var settings = new AppSettings { NowPlayingEnabled = true, BackgroundFadeMs = 0 };
+        OverlayLayout layout = OverlayLayout.Compute(w, h, OverlayStyle.From(settings));
+        OverlayLayout without = OverlayLayout.Compute(w, h, OverlayStyle.From(new AppSettings()));
+        RectD card = layout.NowPlaying;
+        r.Line(string.Create(CultureInfo.InvariantCulture, $"    card {card.X}x{card.Y} {card.Width}x{card.Height}, keyboard bottom {layout.Keyboard.Bottom}, box bottom {layout.SwipeBox.Bottom}"));
+        r.Check("card at the bottom, ~24 % of the content height", !card.IsEmpty && Math.Abs(card.Height - without.SwipeBox.Height * 0.24) < 4
+            && Math.Abs(card.Bottom - without.SwipeBox.Bottom) < 2, true);
+        r.Check("keyboard and mouse area make room (spacing 12 px)", layout.SwipeBox.Bottom <= card.Y - 12 + 0.5 && layout.Keyboard.Bottom <= card.Y - 12 + 0.5, true);
+        OverlayLayout narrow = OverlayLayout.Compute(w, h, OverlayStyle.From(new AppSettings { NowPlayingEnabled = true, NowPlayingWidthPercent = 60, NowPlayingHeightPercent = 30, NowPlayingSpacing = 30 }));
+        r.Check("width 60 % centred, height 30 %, spacing 30 px", Math.Abs(narrow.NowPlaying.Width - card.Width * 0.6) < 4
+            && Math.Abs(narrow.NowPlaying.CenterX - card.CenterX) < 2 && narrow.NowPlaying.Height > card.Height
+            && narrow.SwipeBox.Bottom <= narrow.NowPlaying.Y - 30 + 0.5, true);
+        r.Check("card off: layout unchanged", OverlayLayout.Compute(w, h, OverlayStyle.From(new AppSettings { NowPlayingEnabled = false })), without);
+
+        // Palette like Amuse's: pink subject → Vibrant pink, teal background → DarkMuted teal-ish.
+        var palRaster = new SoftwareRasterizer();
+        var builder = new SwipeModelBuilder();
+        builder.Configure(settings);
+        var tracker = new SwipeTracker();
+        var model = new SwipeRenderModel();
+        long t0 = MonotonicClock.Now;
+        uint[] RenderCard(SoftwareRasterizer raster, SwipeModelBuilder b, NowPlayingInfo? info, double ms)
+        {
+            b.Build(tracker, w, h, t0 + MonotonicClock.MsToTicks(ms), model);
+            model.NowPlaying = info;
+            raster.Render(model);
+            return raster.Pixels.ToArray();
+        }
+
+        var playing = new NowPlayingInfo("Rip It", "Venjent", true, 82_000, 202_000, coverPath, t0);
+        uint[] frame = RenderCard(palRaster, builder, playing, 0);
+        CoverSwatches sw = palRaster.NowPlayingSwatches;
+        r.Line($"    swatches: vibrant 0x{sw.Vibrant:X8}, darkMuted 0x{sw.DarkMuted:X8}, lightVibrant 0x{sw.LightVibrant:X8}, darkVibrant 0x{sw.DarkVibrant:X8}");
+        r.Check("Vibrant is the pink subject", ((sw.Vibrant >> 16) & 0xFF) > 180 && (sw.Vibrant & 0xFF) < 180 && ((sw.Vibrant >> 8) & 0xFF) < 120, true);
+        r.Check("DarkMuted is dark (panel colour)", CoverPalette.Luminance(sw.DarkMuted) < 0.35, true);
+        r.Check("animating while playing", palRaster.IsAnimating, true);
+        SavePng(frame, w, h, "selftest-nowplaying-square.png");
+
+        // Progress bar: filled to 82/202 in accent, rest in track colour.
+        double barH = Math.Max(4, Math.Round(card.Height * 0.07));
+        int row = (int)(card.Bottom - barH / 2);
+        int filled = 0, span = 0;
+        for (int x = (int)card.X + 4; x < (int)card.Right - 4; x++)
+        {
+            span++;
+            uint p = frame[row * w + x];
+            if (((p >> 16) & 0xFF) > 180 && ((p >> 16) & 0xFF) > ((p >> 8) & 0xFF) + 50)
+            {
+                filled++;
+            }
+        }
+
+        double fraction = (double)filled / span;
+        r.Line(string.Create(CultureInfo.InvariantCulture, $"    progress bar filled {fraction:P1} (expected {82.0 / 202:P1})"));
+        r.Check("progress bar shows 01:22 / 03:22", Math.Abs(fraction - 82.0 / 202) < 0.03, true);
+        uint[] later = RenderCard(palRaster, builder, playing, 10_000);
+        int filledLater = 0;
+        for (int x = (int)card.X + 4; x < (int)card.Right - 4; x++)
+        {
+            uint p = later[row * w + x];
+            if (((p >> 16) & 0xFF) > 180 && ((p >> 16) & 0xFF) > ((p >> 8) & 0xFF) + 50)
+            {
+                filledLater++;
+            }
+        }
+
+        r.Check("progress advances locally between checks (10 s later)", filledLater > filled + span * 0.03, true);
+        var paused = playing with { IsPlaying = false };
+        RenderCard(palRaster, builder, paused, 20_000);
+        r.Check("paused: not animating", palRaster.IsAnimating, false);
+
+        // Vinyl: round, spinning while playing, accent label, hollow centre.
+        var vinylSettings = new AppSettings { NowPlayingEnabled = true, NowPlayingCover = NowPlayingCoverStyle.Vinyl, BackgroundFadeMs = 0 };
+        var vb = new SwipeModelBuilder();
+        vb.Configure(vinylSettings);
+        var vr = new SoftwareRasterizer();
+        uint[] v0 = RenderCard(vr, vb, playing, 0);
+        uint[] v1 = RenderCard(vr, vb, playing, 1000);
+        double top = card.Height - barH - Math.Max(3, Math.Round(card.Height * 0.06));
+        double radius = Math.Floor(top) / 2;
+        int cx = (int)(card.X + radius), cy = (int)(card.Y + radius);
+        uint centre = v1[cy * w + cx];
+        uint label = v1[cy * w + cx + (int)(radius * 0.13)];
+        uint corner = v1[((int)card.Y + 1) * w + (int)card.X + 1];
+        uint frameBg = v1[((int)card.Y + 1) * w + (int)card.X - 6];
+        int changed = 0;
+        for (int y = (int)card.Y; y < (int)(card.Y + 2 * radius); y++)
+        {
+            for (int x = (int)card.X; x < (int)(card.X + 2 * radius); x++)
+            {
+                if (v0[y * w + x] != v1[y * w + x])
+                {
+                    changed++;
+                }
+            }
+        }
+
+        r.Line($"    vinyl: centre 0x{centre:X8}, label 0x{label:X8}, corner 0x{corner:X8}, {changed} pixels moved in 1 s");
+        r.Check("vinyl centre is hollow (frame shows through)", centre == frameBg, true);
+        r.Check("vinyl label uses the accent (pink Vibrant, lightened for contrast)", ((label >> 16) & 0xFF) > 180 && ((label >> 16) & 0xFF) > ((label >> 8) & 0xFF) + 50, true);
+        r.Check("vinyl is round (corner of its square is empty)", corner == frameBg, true);
+        r.Check("vinyl spins while playing", changed > 1000, true);
+        uint[] p0 = RenderCard(vr, vb, paused, 2000);
+        uint[] p1 = RenderCard(vr, vb, paused, 3000);
+        int movedPaused = 0;
+        for (int i = 0; i < p0.Length; i++)
+        {
+            if (p0[i] != p1[i])
+            {
+                movedPaused++;
+            }
+        }
+
+        r.Check("paused: the vinyl (and everything) stands still", movedPaused, 0);
+        SavePng(v1, w, h, "selftest-nowplaying-vinyl.png");
+
+        // Nothing playing: placeholder text, no crash.
+        uint[] nothing = RenderCard(new SoftwareRasterizer(), builder, null, 0);
+        SavePng(nothing, w, h, "selftest-nowplaying-nothing.png");
+        r.Check("nothing playing renders", nothing.Length, w * h);
+
+        const string wallpaper = @"C:\Windows\Web\Wallpaper\Windows\img0.jpg";
+        if (File.Exists(wallpaper))
+        {
+            var glassBuilder = new SwipeModelBuilder();
+            glassBuilder.Configure(new AppSettings
+            {
+                NowPlayingEnabled = true, NowPlayingCover = NowPlayingCoverStyle.Vinyl, BackgroundImagePath = coverPath,
+                GlassEnabled = true, BackgroundFadeMs = 0,
+            });
+            SavePng(RenderCard(new SoftwareRasterizer(), glassBuilder, playing, 0), w, h, "selftest-nowplaying-glass.png");
+        }
     }
 
     private static void TestGestureDirections(Report r)

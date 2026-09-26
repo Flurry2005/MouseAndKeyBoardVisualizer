@@ -111,6 +111,16 @@ public sealed class SwipeEngine : IDisposable
     private string? _backgroundOverride;
     private int _backgroundOverridePending;
 
+    /// <summary>Thread-safe: what is playing, for the now-playing card (null = nothing).</summary>
+    public void SetNowPlaying(NowPlayingInfo? info)
+    {
+        Volatile.Write(ref _nowPlaying, info);
+        _wake.Set();
+    }
+
+    private NowPlayingInfo? _nowPlaying;
+    private NowPlayingInfo? _lastNowPlaying;
+
     /// <summary>Wakes the engine, e.g. after an output became active.</summary>
     public void Wake() => _wake.Set();
 
@@ -219,13 +229,15 @@ public sealed class SwipeEngine : IDisposable
         }
 
         _builder.Build(_tracker, width, height, now, _model, Keyboard);
+        NowPlayingInfo? nowPlaying = Volatile.Read(ref _nowPlaying);
+        _model.NowPlaying = nowPlaying;
         long modelDone = MonotonicClock.Now;
 
         bool empty = _model.IsEmpty;
         bool sameSize = width == _lastWidth && height == _lastHeight;
         long keyboardVersion = Keyboard?.Version ?? 0;
         bool rasterize = _forceRaster || !sameSize || !(empty && _lastFrameEmpty) || keyboardVersion != _lastKeyboardVersion
-                         || _rasterizer.IsAnimating;
+                         || _rasterizer.IsAnimating || !ReferenceEquals(nowPlaying, _lastNowPlaying);
         if (rasterize)
         {
             _rasterizer.Render(_model);
@@ -236,6 +248,7 @@ public sealed class SwipeEngine : IDisposable
             _lastHeight = height;
             _lastFrameEmpty = empty;
             _lastKeyboardVersion = keyboardVersion;
+            _lastNowPlaying = nowPlaying;
             _forceRaster = false;
         }
         else

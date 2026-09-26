@@ -52,6 +52,9 @@ public sealed class SwipeRenderModel
 
     public int Width { get; set; }
 
+    /// <summary>What is playing (for the now-playing card); null = nothing / not connected.</summary>
+    public NowPlayingInfo? NowPlaying { get; set; }
+
     /// <summary>Frame time (<see cref="Utilities.MonotonicClock"/> ticks); drives the picture crossfade.</summary>
     public long Now { get; set; }
 

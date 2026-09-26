@@ -274,6 +274,39 @@
             </Grid>
         </GroupBox>
 
+        <GroupBox Header="Now playing card (Spotify)" Padding="8,4" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <CheckBox x:Name="NowPlayingCheck" Grid.ColumnSpan="3" Content="Show what's playing under the keyboard and mouse area" />
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0,2" Opacity="0.8"
+                           Text="Uses the Spotify connection below (Client ID/secret + Connect)." />
+                <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Cover" />
+                <ComboBox x:Name="NowPlayingCoverCombo" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+                <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Height (%)" />
+                <Slider x:Name="NowPlayingHeightSlider" Grid.Row="3" Grid.Column="1" Minimum="10" Maximum="50" SmallChange="1" LargeChange="5"
+                        ToolTip="Card height in % of the space inside the frame; the keyboard and mouse area make room." />
+                <TextBox x:Name="NowPlayingHeightBox" Grid.Row="3" Grid.Column="2" />
+                <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Width (%)" />
+                <Slider x:Name="NowPlayingWidthSlider" Grid.Row="4" Grid.Column="1" Minimum="30" Maximum="100" SmallChange="1" LargeChange="5" />
+                <TextBox x:Name="NowPlayingWidthBox" Grid.Row="4" Grid.Column="2" />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Spacing above (px)" />
+                <Slider x:Name="NowPlayingSpacingSlider" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="80" SmallChange="1" LargeChange="4" />
+                <TextBox x:Name="NowPlayingSpacingBox" Grid.Row="5" Grid.Column="2" />
+                <CheckBox x:Name="NowPlayingMagicCheck" Grid.Row="6" Grid.ColumnSpan="3" Margin="0,4,0,0"
+                          Content="Colours from the cover (panels, text, bars and progress)" />
+                <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Tint (colours off)" />
+                <TextBox x:Name="NowPlayingTintBox" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,3" />
+            </Grid>
+        </GroupBox>
+
         <GroupBox Header="Spotify cover art" Padding="8,4" Margin="0,10,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>

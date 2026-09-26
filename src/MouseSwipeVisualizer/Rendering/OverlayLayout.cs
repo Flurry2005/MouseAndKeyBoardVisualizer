@@ -64,7 +64,14 @@ public sealed record OverlayStyle(
     bool AccentKeyBorders = false,
     bool AccentPressedKeys = false,
     bool AccentFrameBorders = false,
-    bool AutoContrast = false)
+    bool AutoContrast = false,
+    bool NowPlayingEnabled = false,
+    double NowPlayingHeight = 0.24,
+    double NowPlayingWidth = 1,
+    double NowPlayingSpacing = 12,
+    NowPlayingCoverStyle NowPlayingCover = NowPlayingCoverStyle.Square,
+    bool NowPlayingMagicColors = true,
+    uint NowPlayingTint = 0xFFFFFFFF)
 {
     public static OverlayStyle From(AppSettings s)
     {
@@ -94,7 +101,9 @@ public sealed record OverlayStyle(
             s.CoverColorsEnabled && s.CoverAccentKeyBorders,
             s.CoverColorsEnabled && s.CoverAccentPressedKeys,
             s.CoverColorsEnabled && s.CoverAccentFrameBorders,
-            s.CoverColorsEnabled && s.CoverAutoContrast);
+            s.CoverColorsEnabled && s.CoverAutoContrast,
+            s.NowPlayingEnabled, s.NowPlayingHeightPercent / 100.0, s.NowPlayingWidthPercent / 100.0, s.NowPlayingSpacing,
+            s.NowPlayingCover, s.NowPlayingMagicColors, Argb(s.NowPlayingTintColor, System.Windows.Media.Colors.White));
     }
 }
 
@@ -113,7 +122,8 @@ public readonly record struct OverlayLayout(
     RectD SwipeBox = default,
     RectD SwipeClip = default,
     double SwipeRadius = 0,
-    double KeyUnit = 0)
+    double KeyUnit = 0,
+    RectD NowPlaying = default)
 {
     public static OverlayLayout Compute(int width, int height, OverlayStyle style)
     {
@@ -162,9 +172,20 @@ public readonly record struct OverlayLayout(
         frame = new RectD(Even(frame.X), Even(frame.Y), Even(frame.Width), Even(frame.Height));
         frame = Scaled(frame, style.FrameWidth, style.FrameHeight);
         RectD content = frame.Deflate((style.FrameEnabled ? style.FrameBorderWidth : 0) + style.FramePadding);
+
+        // Now-playing card: a strip at the bottom of the content; keyboard and mouse area use the rest.
+        RectD nowPlaying = default;
+        if (style.NowPlayingEnabled && !content.IsEmpty)
+        {
+            double h = Even(content.Height * Math.Clamp(style.NowPlayingHeight, 0.05, 0.9));
+            double w = Even(content.Width * Math.Clamp(style.NowPlayingWidth, 0.1, 1));
+            nowPlaying = new RectD(Even(content.CenterX - w / 2), content.Bottom - h, w, h);
+            content = new RectD(content.X, content.Y, content.Width, Math.Max(0, content.Height - h - Math.Max(0, style.NowPlayingSpacing)));
+        }
+
         if (!style.KeyboardEnabled || content.IsEmpty)
         {
-            return WithSwipeBox(new OverlayLayout(frame, default, content), style);
+            return WithSwipeBox(new OverlayLayout(frame, default, content), style) with { NowPlaying = nowPlaying };
         }
 
         double gap = Math.Max(8, style.FramePadding);
@@ -193,7 +214,7 @@ public readonly record struct OverlayLayout(
                 break;
         }
 
-        return WithSwipeBox(new OverlayLayout(frame, keyboard, swipe), style);
+        return WithSwipeBox(new OverlayLayout(frame, keyboard, swipe), style) with { NowPlaying = nowPlaying };
     }
 
     /// <summary>The swipe area becomes the box (optionally smaller, centred); the swipe is drawn inside its border + padding.</summary>
@@ -247,6 +268,15 @@ public readonly record struct OverlayLayout(
     }
 }
 
+/// <summary>Fonts for card text.</summary>
+public enum TextFont
+{
+    Regular,
+    Semibold,
+    Bold,
+    Symbol,
+}
+
 /// <summary>Anti-aliased label/glyph coverage mask (0-255).</summary>
 public sealed record GlyphMask(int Width, int Height, byte[] Alpha);
 
@@ -259,6 +289,88 @@ public sealed class GlyphCache
     private const int MaxEntries = 256;
     private const string ShiftArrow = "⇧";
     private readonly Dictionary<(string Text, int Size, bool Symbol), GlyphMask> _cache = new();
+
+    private readonly Dictionary<(string Text, int Size, TextFont Font), GlyphMask> _textCache = new();
+
+    /// <summary>
+    /// One line of text in a fixed-height line box (trimmed horizontally only), so different strings in the
+    /// same font share a baseline when centred on the same line.
+    /// </summary>
+    public GlyphMask GetText(string text, int pixelSize, TextFont font)
+    {
+        var key = (text, pixelSize, font);
+        if (_textCache.TryGetValue(key, out GlyphMask? mask))
+        {
+            return mask;
+        }
+
+        if (_textCache.Count >= MaxEntries)
+        {
+            _textCache.Clear();
+        }
+
+        mask = RenderText(text, Math.Max(4, pixelSize), font);
+        _textCache[key] = mask;
+        return mask;
+    }
+
+    private static GlyphMask RenderText(string text, int pixelSize, TextFont font)
+    {
+        if (text.Length == 0)
+        {
+            return new GlyphMask(0, 0, Array.Empty<byte>());
+        }
+
+        int width = Math.Min(16000, pixelSize * (text.Length + 2) + 8);
+        int height = (int)Math.Ceiling(pixelSize * 1.5) + 8;
+        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using (Graphics g = Graphics.FromImage(bitmap))
+        {
+            g.Clear(Color.Transparent);
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+            string family = font switch { TextFont.Semibold => "Segoe UI Semibold", TextFont.Symbol => "Segoe UI Symbol", _ => "Segoe UI" };
+            using var f = new Font(family, pixelSize, font == TextFont.Bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
+            g.DrawString(text, f, Brushes.White, 4, 4, StringFormat.GenericTypographic);
+        }
+
+        BitmapData data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        var pixels = new int[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            Marshal.Copy(data.Scan0 + y * data.Stride, pixels, y * width, width);
+        }
+
+        bitmap.UnlockBits(data);
+        int minX = width, maxX = -1;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if ((pixels[y * width + x] >>> 24) > 8)
+                {
+                    minX = Math.Min(minX, x);
+                    maxX = Math.Max(maxX, x);
+                }
+            }
+        }
+
+        if (maxX < 0)
+        {
+            return new GlyphMask(0, 0, Array.Empty<byte>());
+        }
+
+        int w = maxX - minX + 1;
+        var alpha = new byte[w * height];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                alpha[y * w + x] = (byte)(pixels[y * width + x + minX] >>> 24);
+            }
+        }
+
+        return new GlyphMask(w, height, alpha);
+    }
 
     public GlyphMask Get(string text, int pixelSize, bool symbol)
     {

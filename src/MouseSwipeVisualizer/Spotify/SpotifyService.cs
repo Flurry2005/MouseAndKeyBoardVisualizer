@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MouseSwipeVisualizer.Rendering;
 using MouseSwipeVisualizer.Settings;
 using MouseSwipeVisualizer.Utilities;
 
@@ -69,6 +70,33 @@ public sealed class SpotifyService : IDisposable
     /// <summary>Raised on a background thread with the new cover file, or null to use the normal background.</summary>
     public event Action<string?>? CoverChanged;
 
+    /// <summary>Raised on a background thread after every successful check (null = nothing playing / not connected).</summary>
+    public event Action<NowPlayingInfo?>? NowPlayingChanged;
+
+    private bool _reportedNothing;
+
+    private void ReportNowPlaying(NowPlayingInfo? info)
+    {
+        if (info == null)
+        {
+            if (_reportedNothing)
+            {
+                return;
+            }
+
+            _reportedNothing = true;
+        }
+        else
+        {
+            _reportedNothing = false;
+        }
+
+        NowPlayingChanged?.Invoke(info);
+    }
+
+    /// <summary>The cover file currently shown (null = none).</summary>
+    public string? CurrentCoverPath => _coverPath;
+
     public static string RedirectUri(int port) => $"http://127.0.0.1:{port}{CallbackPath}";
 
     public string Status => _enabled ? _status : "Off." + (IsConnected ? " (Spotify account connected.)" : string.Empty);
@@ -109,7 +137,7 @@ public sealed class SpotifyService : IDisposable
             _smartTiming = settings.SpotifySmartTiming;
         }
 
-        bool enable = settings.SpotifyCoverEnabled;
+        bool enable = settings.SpotifyCoverEnabled || settings.NowPlayingEnabled; // both need to know what is playing
         if (enable && !_enabled)
         {
             _enabled = true;
@@ -124,6 +152,7 @@ public sealed class SpotifyService : IDisposable
             _pollCts?.Cancel();
             _pollCts = null;
             SetCover(null, null);
+            ReportNowPlaying(null);
         }
 
         if (changed)
@@ -304,6 +333,7 @@ public sealed class SpotifyService : IDisposable
         {
             _status = "Not connected: enter your Client ID and secret, then Connect.";
             SetCover(null, null);
+            ReportNowPlaying(null);
             return null;
         }
 
@@ -326,6 +356,8 @@ public sealed class SpotifyService : IDisposable
             case HttpStatusCode.OK when response.Playing != null:
                 NowPlaying now = response.Playing;
                 await UpdateCoverAsync(now.ImageUrl, cancel);
+                ReportNowPlaying(new NowPlayingInfo(now.Title, now.Artist, now.IsPlaying, now.ProgressMs, now.DurationMs,
+                    _coverPath, Utilities.MonotonicClock.Now));
                 _lastLoggedError = null;
                 TimeSpan safety;
                 bool smart;
@@ -344,6 +376,7 @@ public sealed class SpotifyService : IDisposable
                 _status = "Connected: nothing playing.";
                 _endWatch = default;
                 SetCover(null, null);
+                ReportNowPlaying(null);
                 return null;
             case HttpStatusCode.Unauthorized:
                 lock (_lock)

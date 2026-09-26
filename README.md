@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.16.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.17.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -256,6 +256,10 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 5; older f
 | `BackgroundImageBlur` / `BackgroundImageDim` | 24 / 20 | Blur (px) and darkening (%) of the background picture. |
 | `GlassEnabled` | false | Glass look: the frame, mouse area and keys become frosted, see-through glass over an extra-blurred copy of the background picture. Pressed keys stay solid. |
 | `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glass tint, tint strength (%) and extra frost blur (px). |
+| `NowPlayingEnabled` | false | Now-playing card under the keyboard and mouse area (see [Now playing card](#now-playing-card)). |
+| `NowPlayingHeightPercent` / `NowPlayingWidthPercent` / `NowPlayingSpacing` | 24 / 100 / 12 | Card height (% of the space inside the frame, 10–50), width (% , 30–100, centred) and space above it (px). The keyboard and mouse area make room. |
+| `NowPlayingCover` | `Square` | `Square` (rounded), `Vinyl` (round, spins while playing, accent-coloured centre label with a hollow hole) or `None`. |
+| `NowPlayingMagicColors` / `NowPlayingTintColor` | true / `#FFFFFF` | Colours from the cover (Vibrant-style palette) or a fixed tint. |
 | `SpotifyCoverEnabled` | false | Use the cover of what's playing on Spotify as the frame picture (see [Spotify cover art](#spotify-cover-art)). |
 | `SpotifyClientId` | empty | Client ID of your own Spotify app. The client secret is **not** stored in settings.json. |
 | `SpotifySmartTiming` | true | Check right when the playing song should end (from its position and length, + 0.8 s), then re-check after 1, 2 and 3 s if Spotify still reports the old song. Natural song changes show up almost immediately with very few requests. |
@@ -275,6 +279,22 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 5; older f
 | `RenderFps` | 60 | Preview frame rate when no camera consumer sets the pace. |
 | `IncludeDebugInCapture` | false | Debug text in the OBS window (development). |
 | `ShowSettingsOnStartup` | true | Open Settings at start. |
+
+### Now playing card
+
+A card like Amuse's compact skin, under the keyboard and mouse area: the cover, a panel with title and
+artist, a panel with the current time, visualizer bars and the song length, and a progress bar. It uses the
+Spotify connection (below); the progress moves smoothly between checks because it is advanced locally from
+Spotify's position, so it costs no extra requests.
+
+* **Colours** ("magic colors"): a Vibrant-style palette from the cover, the same approach as Android's
+  Palette / node-vibrant that Amuse uses: panels DarkMuted, text LightVibrant, bars and progress Vibrant,
+  progress track DarkVibrant. Text, bars and progress are kept readable against the panels (also on glass).
+  Off: a dark card with the tint colour.
+* **Cover**: square, vinyl (round, spins at ~7 rpm while playing, stops when paused, accent-coloured label
+  with a hollow centre) or none. A new cover crossfades with the cover fade time.
+* **Size**: height and width of the whole card and the space above it; the keyboard and mouse area shrink to
+  make room. Long titles scroll slowly back and forth.
 
 ### Spotify cover art
 
@@ -373,6 +393,8 @@ inspection. It covers:
 * **keyboard panel and frames**: the 40/60 split and all positions, key presses only change their own key,
   left/right modifiers, the static layer cache, frame and mouse area sizes (content only shrinks when an edge reaches
   it), anti-aliasing, background picture, glass and borderless modes,
+* **Now playing card**: layout and spacing, the Vibrant palette, the progress bar (position and local
+  advance), the vinyl (round, hollow centre, accent label, spins while playing, still when paused),
 * **Spotify**: encrypted secret storage (nothing in plain text, nothing in settings.json), parsing of tracks,
   episodes and "nothing playing", the cover URL allowlist, the local sign-in listener, and the cover replacing the
   frame picture and going away again (no real Spotify account needed),

@@ -40,6 +40,23 @@ public sealed class AppController : ISettingsHost, IDisposable
     private readonly DispatcherTimer _statsTimer;
     private readonly StringBuilder _statsText = new(2048);
     private readonly SpotifyService _spotify;
+    private string? _spotifyCover;
+    private string? _appliedCover = "\0"; // nothing applied yet
+    private readonly object _coverGate = new();
+
+    /// <summary>The cover is the frame picture only with "Use the cover of what's playing"; the card works either way.</summary>
+    private void ApplySpotifyCover()
+    {
+        lock (_coverGate)
+        {
+            string? wanted = Settings.SpotifyCoverEnabled ? Volatile.Read(ref _spotifyCover) : null;
+            if (wanted != _appliedCover)
+            {
+                _appliedCover = wanted;
+                _engine.SetBackgroundOverride(wanted);
+            }
+        }
+    }
 
     private CaptureWindow? _capture;
     private IntPtr _captureHwnd;
@@ -76,7 +93,12 @@ public sealed class AppController : ISettingsHost, IDisposable
         _statsTimer.Tick += (_, _) => UpdateStats();
 
         _spotify = new SpotifyService(AppPaths.DataDirectory);
-        _spotify.CoverChanged += path => _engine.SetBackgroundOverride(path);
+        _spotify.CoverChanged += path =>
+        {
+            Volatile.Write(ref _spotifyCover, path);
+            ApplySpotifyCover();
+        };
+        _spotify.NowPlayingChanged += info => _engine.SetNowPlaying(info);
     }
 
     public AppSettings Settings { get; private set; }
@@ -253,6 +275,7 @@ public sealed class AppController : ISettingsHost, IDisposable
         _engine.ApplySettings(Settings);
         _capture?.ApplySettings(Settings);
         _spotify.Configure(Settings);
+        ApplySpotifyCover();
         SettingsApplied?.Invoke(Settings);
         if (Settings.OutputMode == OutputMode.ObsCaptureWindow && _capture == null && !_headless)
         {

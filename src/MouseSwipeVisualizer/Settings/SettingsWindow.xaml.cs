@@ -119,6 +119,17 @@ public partial class SettingsWindow : Window
 
         BindBackgroundImage();
         BindSpotify();
+        BindCheck(NowPlayingCheck, () => _host.Settings.NowPlayingEnabled, v => _host.Settings.NowPlayingEnabled = v);
+        BindEnum(NowPlayingCoverCombo, new[] { "Square", "Vinyl (spinning, accent centre)", "None" },
+            () => (int)_host.Settings.NowPlayingCover, v => _host.Settings.NowPlayingCover = (NowPlayingCoverStyle)v);
+        BindSlider(NowPlayingHeightSlider, NowPlayingHeightBox, () => _host.Settings.NowPlayingHeightPercent, v => _host.Settings.NowPlayingHeightPercent = v,
+            AppSettings.MinNowPlayingHeight, AppSettings.MaxNowPlayingHeight, "0");
+        BindSlider(NowPlayingWidthSlider, NowPlayingWidthBox, () => _host.Settings.NowPlayingWidthPercent, v => _host.Settings.NowPlayingWidthPercent = v,
+            AppSettings.MinNowPlayingWidth, 100, "0");
+        BindSlider(NowPlayingSpacingSlider, NowPlayingSpacingBox, () => _host.Settings.NowPlayingSpacing, v => _host.Settings.NowPlayingSpacing = v,
+            0, AppSettings.MaxNowPlayingSpacing, "0");
+        BindCheck(NowPlayingMagicCheck, () => _host.Settings.NowPlayingMagicColors, v => _host.Settings.NowPlayingMagicColors = v);
+        BindColor(NowPlayingTintBox, () => _host.Settings.NowPlayingTintColor, v => _host.Settings.NowPlayingTintColor = v);
         BindSlider(BgBlurSlider, BgBlurBox, () => _host.Settings.BackgroundImageBlur, v => _host.Settings.BackgroundImageBlur = v, 0, AppSettings.MaxImageBlur, "0");
         BindSlider(BgDimSlider, BgDimBox, () => _host.Settings.BackgroundImageDim, v => _host.Settings.BackgroundImageDim = v, 0, AppSettings.MaxImageDim, "0");
         BindCheck(GlassCheck, () => _host.Settings.GlassEnabled, v => _host.Settings.GlassEnabled = v);
