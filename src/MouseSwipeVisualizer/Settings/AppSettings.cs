@@ -70,7 +70,7 @@ public sealed class WindowPlacementSettings
 /// </summary>
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public const double MinTrailLifetimeMs = 50, MaxTrailLifetimeMs = 5000, DefaultTrailLifetimeMs = 500;
     public const double MinTrailThickness = 1, MaxTrailThickness = 32, DefaultTrailThickness = 4;
@@ -85,7 +85,7 @@ public sealed class AppSettings
     public const double MinDotSize = 2, MaxDotSize = 48, DefaultDotSize = 12;
     public const int MinKeyboardSplit = 20, MaxKeyboardSplit = 70, DefaultKeyboardSplit = 40;
     public const double MinSwipeBoxPercent = 20, MaxSwipeBoxPercent = 100;
-    public const double MinSpotifyPollSeconds = 1, MaxSpotifyPollSeconds = 60, DefaultSpotifyPollSeconds = 3;
+    public const double MinSpotifyPollSeconds = 1, MaxSpotifyPollSeconds = 300, DefaultSpotifyPollSeconds = 15;
     public const int DefaultSpotifyPort = 8888;
     public const double MaxBackgroundFadeMs = 5000, DefaultBackgroundFadeMs = 600;
     public const double MaxImageBlur = 100, MaxImageDim = 90, MaxGlassOpacity = 60, MaxGlassBlur = 100;
@@ -273,8 +273,14 @@ public sealed class AppSettings
     /// <summary>Client ID of the user's own Spotify app. The client secret is NOT stored here (DPAPI file).</summary>
     public string SpotifyClientId { get; set; } = string.Empty;
 
-    /// <summary>How often to check what is playing (s).</summary>
+    /// <summary>How often to check what is playing (s); with smart timing: the safety check for skips/pauses.</summary>
     public double SpotifyPollSeconds { get; set; } = DefaultSpotifyPollSeconds;
+
+    /// <summary>
+    /// Check right when the playing song should end (from its position and length), with a few quick
+    /// re-checks; <see cref="SpotifyPollSeconds"/> then only catches skips and pauses.
+    /// </summary>
+    public bool SpotifySmartTiming { get; set; } = true;
 
     /// <summary>Port of the local OAuth redirect: http://127.0.0.1:PORT/callback.</summary>
     public int SpotifyRedirectPort { get; set; } = DefaultSpotifyPort;
@@ -409,6 +415,13 @@ public sealed class AppSettings
         {
             fixes.Add("Window placement invalid");
             Window = null;
+        }
+
+        // Schema 5: smart Spotify timing. The old 3 s default only served as "poll often"; now it is the
+        // slow safety check (a value the user picked themselves is kept).
+        if (SchemaVersion < 5 && SpotifyPollSeconds == 3)
+        {
+            SpotifyPollSeconds = DefaultSpotifyPollSeconds;
         }
 
         SchemaVersion = CurrentSchemaVersion;

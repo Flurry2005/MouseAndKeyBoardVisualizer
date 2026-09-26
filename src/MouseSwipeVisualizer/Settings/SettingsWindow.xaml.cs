@@ -423,6 +423,7 @@ public partial class SettingsWindow : Window
     private void BindSpotify()
     {
         BindCheck(SpotifyCheck, () => _host.Settings.SpotifyCoverEnabled, v => _host.Settings.SpotifyCoverEnabled = v);
+        BindCheck(SpotifySmartCheck, () => _host.Settings.SpotifySmartTiming, v => _host.Settings.SpotifySmartTiming = v);
         BindSlider(SpotifyPollSlider, SpotifyPollBox, () => _host.Settings.SpotifyPollSeconds, v => _host.Settings.SpotifyPollSeconds = v,
             AppSettings.MinSpotifyPollSeconds, AppSettings.MaxSpotifyPollSeconds, "0");
         BindCheck(CoverColorsCheck, () => _host.Settings.CoverColorsEnabled, v => _host.Settings.CoverColorsEnabled = v);

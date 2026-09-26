@@ -9,8 +9,9 @@ namespace MouseSwipeVisualizer.Spotify;
 /// <summary>Access token from the Spotify accounts service.</summary>
 public sealed record SpotifyToken(string AccessToken, DateTime ExpiresUtc, string? RefreshToken);
 
-/// <summary>What is playing, as far as the cover art is concerned.</summary>
-public sealed record NowPlaying(string Title, string Artist, string? ImageUrl, bool IsPlaying);
+/// <summary>What is playing: cover art plus position/length, used to check again right when the song ends.</summary>
+public sealed record NowPlaying(string Title, string Artist, string? ImageUrl, bool IsPlaying,
+    string? Id = null, long ProgressMs = 0, long DurationMs = 0);
 
 /// <summary>Result of one "currently playing" request.</summary>
 public readonly record struct PlaybackResponse(HttpStatusCode Status, NowPlaying? Playing, TimeSpan? RetryAfter);
@@ -121,7 +122,10 @@ public static class SpotifyClient
             }
         }
 
-        return new NowPlaying(title, artist, image, playing);
+        long progress = root.TryGetProperty("progress_ms", out JsonElement pr) && pr.TryGetInt64(out long pv) ? pv : 0;
+        long duration = item.TryGetProperty("duration_ms", out JsonElement du) && du.TryGetInt64(out long dv) ? dv : 0;
+        string? id = Str(item, "id") ?? Str(item, "uri");
+        return new NowPlaying(title, artist, image, playing, id, progress, duration);
     }
 
     private static string? LargestImage(JsonElement owner)

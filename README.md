@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.13.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.14.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -223,7 +223,7 @@ can solve. Alternatives:
 
 ## Settings
 
-Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older files are migrated).
+Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 5; older files are migrated).
 
 | Setting | Default | Description |
 |---|---|---|
@@ -258,7 +258,8 @@ Stored in `%LocalAppData%\MouseSwipeVisualizer\settings.json` (schema 4; older f
 | `GlassTintColor` / `GlassOpacity` / `GlassBlur` | `#FFFFFF` / 12 / 16 | Glass tint, tint strength (%) and extra frost blur (px). |
 | `SpotifyCoverEnabled` | false | Use the cover of what's playing on Spotify as the frame picture (see [Spotify cover art](#spotify-cover-art)). |
 | `SpotifyClientId` | empty | Client ID of your own Spotify app. The client secret is **not** stored in settings.json. |
-| `SpotifyPollSeconds` | 3 | How often to check what's playing (1–60 s); the cover changes within this time after a song change. |
+| `SpotifySmartTiming` | true | Check right when the playing song should end (from its position and length, + 0.8 s), then re-check after 1, 2 and 3 s if Spotify still reports the old song. Natural song changes show up almost immediately with very few requests. |
+| `SpotifyPollSeconds` | 15 | Regular check (1–300 s). With smart timing it only catches skips, pauses and newly picked songs, which Spotify doesn't announce, so it can be slow; without smart timing it is the only check. |
 | `BackgroundFadeMs` | 600 | Crossfade (ms, 0–5000) when the cover or background picture changes; 0 = switch instantly. |
 | `CoverColorsEnabled` | true | Take colours from the cover / background picture. Spotify's API sends no colours, so the accent (the most prominent saturated colour) is extracted from the image. Grey covers keep the normal colours. |
 | `CoverAccentTrail` / `CoverAccentKeyBorders` | true / true | Accent colour for the mouse strokes (line, arrow, dot) and the key outlines. |
@@ -289,7 +290,8 @@ Setup (once):
 2. In the app's settings, copy the **Client ID** and click **View client secret** to copy the secret.
 3. In Mouse Swipe Visualizer, go to **Settings → Spotify cover art**. Paste both, click **Connect Spotify…** and
    approve access in the browser that opens.
-4. Tick **Use the cover of what's playing on Spotify** and choose how often to check (**Check every … s**, default 3)
+4. Tick **Use the cover of what's playing on Spotify**. **Check when the song ends** (on by default) checks right
+   when a song should finish; **Also check every … s** (default 15) catches skips and pauses. Choose
    and how long the crossfade to a new cover takes (**Cover fade (ms)**, default 600; 0 = instant).
 5. Optional: **Use colours from the cover** tints the mouse strokes and key outlines (and, if ticked, pressed keys
    and frame borders) with the cover's accent colour. The colours crossfade together with the cover.
@@ -307,7 +309,8 @@ Security and privacy:
   value and closes after the sign-in (or after 3 minutes).
 * Covers are only downloaded over HTTPS from Spotify's image servers (max 5 MB), into
   `%LocalAppData%\MouseSwipeVisualizer\spotify-covers`, which keeps only the last few covers.
-* It polls at most once per second, whatever the settings, and honours Spotify's rate-limit `Retry-After`.
+* It checks at most once per second, whatever the settings, and honours Spotify's rate-limit `Retry-After`.
+  With smart timing a typical song costs a handful of requests instead of one every few seconds.
 
 **Keyboard and privacy:** Raw Input for the keyboard is only registered while `KeyboardEnabled` is on. Only the
 up/down state of the 27 keys in the block is kept in memory, per physical key (scan code), so the layout is the same

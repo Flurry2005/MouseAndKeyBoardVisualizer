@@ -297,9 +297,9 @@
                 <TextBox x:Name="SpotifyRedirectBox" Grid.Row="4" Grid.Column="1" Margin="0,3" IsReadOnly="True"
                          ToolTip="Add exactly this URI under Redirect URIs in your Spotify app's settings." />
                 <TextBox x:Name="SpotifyPortBox" Grid.Row="4" Grid.Column="2" Margin="4,3,0,3" ToolTip="Callback port (1024-65535)" />
-                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Check every (s)" />
-                <Slider x:Name="SpotifyPollSlider" Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="60" SmallChange="1" LargeChange="5"
-                        ToolTip="How often to check what is playing; the cover updates within this time after a song change." />
+                <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Also check every (s)" />
+                <Slider x:Name="SpotifyPollSlider" Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="300" SmallChange="1" LargeChange="10"
+                        ToolTip="Regular check. With &quot;Check when the song ends&quot; this only catches skips, pauses and new picks, so it can be slow." />
                 <TextBox x:Name="SpotifyPollBox" Grid.Row="5" Grid.Column="2" />
                 <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Cover fade (ms)" />
                 <Slider x:Name="BgFadeSlider" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="5000" SmallChange="50" LargeChange="250"
@@ -317,6 +317,8 @@
                               ToolTip="Darker accent and dark key labels on light covers, brighter accent on dark covers." />
                 </WrapPanel>
                 <StackPanel Grid.Row="9" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4">
+                    <CheckBox x:Name="SpotifySmartCheck" Content="Check when the song ends" VerticalAlignment="Center" Margin="0,0,14,0"
+                              ToolTip="Uses the song's position and length to check right after it ends (plus a few quick re-checks), instead of polling often." />
                     <Button x:Name="SpotifyConnectButton" Content="Connect Spotify…" Padding="10,2" />
                     <Button x:Name="SpotifyDisconnectButton" Content="Disconnect" Padding="10,2" Margin="6,0,0,0"
                             ToolTip="Forget the saved client secret and sign-in" />

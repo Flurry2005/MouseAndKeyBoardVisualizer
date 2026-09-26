@@ -1382,6 +1382,14 @@ public static class SelfTest
         var s = new AppSettings { SpotifyPollSeconds = 0.2, SpotifyRedirectPort = 80 };
         s.Sanitize();
         r.Check("poll interval and port sanitized", s.SpotifyPollSeconds == AppSettings.MinSpotifyPollSeconds && s.SpotifyRedirectPort == AppSettings.DefaultSpotifyPort, true);
+        var slow = new AppSettings { SpotifyPollSeconds = 900 };
+        slow.Sanitize();
+        r.Check("safety interval capped at 300 s", slow.SpotifyPollSeconds, AppSettings.MaxSpotifyPollSeconds);
+        var legacy = new AppSettings { SchemaVersion = 4, SpotifyPollSeconds = 3 };
+        legacy.Sanitize();
+        var picked = new AppSettings { SchemaVersion = 4, SpotifyPollSeconds = 7 };
+        picked.Sanitize();
+        r.Check("old 3 s default migrates to 15 s; a chosen value is kept", legacy.SpotifyPollSeconds == 15 && picked.SpotifyPollSeconds == 7 && legacy.SchemaVersion == 5, true);
 
         // 3) Parsing /me/player/currently-playing.
         const string track = """
@@ -1403,6 +1411,34 @@ public static class SelfTest
             && !Spotify.SpotifyClient.IsAllowedImageUrl("http://i.scdn.co/image/ab67") && !Spotify.SpotifyClient.IsAllowedImageUrl("https://i.scdn.co.evil.example/x")
             && !Spotify.SpotifyClient.IsAllowedImageUrl("https://evil.example/i.scdn.co") && !Spotify.SpotifyClient.IsAllowedImageUrl("file:///C:/x.png")
             && !Spotify.SpotifyClient.IsAllowedImageUrl("https://i.scdn.co:8443/x"), true);
+
+        // 3b) Smart timing: check when the song ends, re-check a few times, safety interval otherwise.
+        const string timed = """
+            {"is_playing":true,"progress_ms":190000,"item":{"type":"track","id":"t1","name":"Song","duration_ms":200000,"artists":[],"album":{"images":[]}}}
+            """;
+        Spotify.NowPlaying? song = Spotify.SpotifyClient.ParseCurrentlyPlaying(timed);
+        r.Check("parses song id, position and length", song is { Id: "t1", ProgressMs: 190000, DurationMs: 200000 }, true, song?.ToString());
+        TimeSpan safety = TimeSpan.FromSeconds(15);
+        var watch = default(Spotify.SongEndWatch);
+        TimeSpan toEnd = Spotify.SpotifySchedule.NextDelay(song, safety, true, ref watch);
+        r.Check("10 s left: next check right after the end (10.8 s)", Math.Abs(toEnd.TotalSeconds - 10.8) < 0.01, true, toEnd.ToString());
+        Spotify.NowPlaying atEnd = song! with { ProgressMs = 199700 };
+        var retries = new List<double>();
+        for (int i = 0; i < 4; i++)
+        {
+            retries.Add(Spotify.SpotifySchedule.NextDelay(atEnd, safety, true, ref watch).TotalSeconds);
+        }
+
+        r.Line($"    same song still reported at its end: re-checks after {string.Join(", ", retries)} s");
+        r.Check("old song still reported: re-checks after 1, 2, 3 s, then the regular interval", retries.SequenceEqual(new[] { 1.0, 2.0, 3.0, 15.0 }), true);
+        var next = new Spotify.NowPlaying("Next", "", null, true, "t2", 1000, 180000);
+        r.Check("new song: regular interval while far from its end", Spotify.SpotifySchedule.NextDelay(next, safety, true, ref watch), safety);
+        r.Check("paused: regular interval", Spotify.SpotifySchedule.NextDelay(song with { IsPlaying = false }, safety, true, ref watch), safety);
+        r.Check("smart timing off: regular interval", Spotify.SpotifySchedule.NextDelay(song, TimeSpan.FromSeconds(3), false, ref watch), TimeSpan.FromSeconds(3));
+        var repeat = default(Spotify.SongEndWatch);
+        Spotify.SpotifySchedule.NextDelay(song, safety, true, ref repeat);
+        TimeSpan replay = Spotify.SpotifySchedule.NextDelay(song with { ProgressMs = 5000 }, safety, true, ref repeat);
+        r.Check("same song restarted (repeat/seek back): normal schedule, no re-check burst", replay, safety);
 
         // 4) OAuth redirect listener on 127.0.0.1 (random free port).
         int port;

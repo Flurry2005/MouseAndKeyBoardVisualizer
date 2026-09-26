@@ -39,6 +39,8 @@ public sealed class SpotifyService : IDisposable
     private string _clientId = string.Empty;
     private int _port = AppSettings.DefaultSpotifyPort;
     private double _pollSeconds = AppSettings.DefaultSpotifyPollSeconds;
+    private bool _smartTiming = true;
+    private SongEndWatch _endWatch;
     private bool _enabled;
     private string? _accessToken;
     private DateTime _accessExpiresUtc;
@@ -93,10 +95,11 @@ public sealed class SpotifyService : IDisposable
         lock (_lock)
         {
             string clientId = settings.SpotifyClientId.Trim();
-            changed = clientId != _clientId || settings.SpotifyPollSeconds != _pollSeconds;
+            changed = clientId != _clientId || settings.SpotifyPollSeconds != _pollSeconds || settings.SpotifySmartTiming != _smartTiming;
             _clientId = clientId;
             _port = settings.SpotifyRedirectPort;
             _pollSeconds = settings.SpotifyPollSeconds;
+            _smartTiming = settings.SpotifySmartTiming;
         }
 
         bool enable = settings.SpotifyCoverEnabled;
@@ -302,13 +305,24 @@ public sealed class SpotifyService : IDisposable
         {
             case HttpStatusCode.OK when response.Playing != null:
                 NowPlaying now = response.Playing;
-                _status = $"Connected: {(now.IsPlaying ? "playing" : "paused")} {now.Title}{(now.Artist.Length > 0 ? " – " + now.Artist : string.Empty)}";
                 await UpdateCoverAsync(now.ImageUrl, cancel);
                 _lastLoggedError = null;
-                return null;
+                TimeSpan safety;
+                bool smart;
+                lock (_lock)
+                {
+                    safety = TimeSpan.FromSeconds(_pollSeconds);
+                    smart = _smartTiming;
+                }
+
+                TimeSpan next = SpotifySchedule.NextDelay(now, safety, smart, ref _endWatch);
+                _status = $"Connected: {(now.IsPlaying ? "playing" : "paused")} {now.Title}{(now.Artist.Length > 0 ? " – " + now.Artist : string.Empty)}" +
+                          $" · next check {DateTime.Now + next:HH:mm:ss}";
+                return next;
             case HttpStatusCode.OK:
             case HttpStatusCode.NoContent:
                 _status = "Connected: nothing playing.";
+                _endWatch = default;
                 SetCover(null, null);
                 return null;
             case HttpStatusCode.Unauthorized:
