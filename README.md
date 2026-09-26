@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.14.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.15.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 

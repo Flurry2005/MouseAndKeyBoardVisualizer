@@ -69,6 +69,12 @@ public static class SelfTest
 
         report.Run("Interop struct layout", TestStructLayout);
         report.Run("App icon (Start menu / search)", TestAppIcon);
+        report.Run("Camera in use: friendly message", r =>
+        {
+            var inUse = new System.Runtime.InteropServices.COMException("Maskinvarans MFT kunde inte starta direktuppspelningen (0xC00D3704)", CameraDiagnostics.CameraInUseHResult);
+            r.Check("0xC00D3704 is recognised (also wrapped)", CameraDiagnostics.IsCameraInUse(inUse) && CameraDiagnostics.IsCameraInUse(new InvalidOperationException("open failed", inUse)), true);
+            r.Check("other errors are not", CameraDiagnostics.IsCameraInUse(new InvalidOperationException("device not found")), false);
+        });
         report.Run("Settings save/load round trip", TestSettingsRoundTrip);
         report.Run("Settings corrupt JSON fallback", TestSettingsCorrupt);
         report.Run("Settings out-of-range sanitizing", TestSettingsSanitize);

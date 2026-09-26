@@ -144,12 +144,43 @@ public sealed class CameraDiagnostics
         }
         catch (Exception ex)
         {
-            Logger.Error($"Camera action {action} failed.", ex);
-            output.WriteLine("Error: " + ex.Message);
+            if (IsCameraInUse(ex))
+            {
+                // Not a failure of the camera: another app is streaming it (only one app at a time, like a webcam).
+                Logger.Info($"Camera action {action}: the camera is in use by another app.");
+                output.WriteLine(CameraInUseMessage);
+            }
+            else
+            {
+                Logger.Error($"Camera action {action} failed.", ex);
+                output.WriteLine("Error: " + ex.Message);
+            }
         }
 
         return output.ToString();
     });
+
+    /// <summary>MF_E_HW_MFT_FAILED_START_STREAMING: Windows' "camera already in use by another app" error.</summary>
+    public const int CameraInUseHResult = unchecked((int)0xC00D3704);
+
+    public const string CameraInUseMessage =
+        "The camera is working, but another app is using it right now (for example Medal, OBS, Discord or a browser tab), " +
+        "so the test could not open it. Like a normal webcam, only one app can stream the camera at a time." + "\n\n" +
+        "That app still gets the picture. To run the test, close that app's camera preview first.";
+
+    /// <summary>True for the "camera already in use" error, wherever it is wrapped.</summary>
+    public static bool IsCameraInUse(Exception? ex)
+    {
+        for (; ex != null; ex = ex.InnerException)
+        {
+            if (ex.HResult == CameraInUseHResult || ex.Message.Contains("0xC00D3704", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Start-up: (re)creates the camera for this user when the media source is installed.</summary>
     public static void EnsureCameraRegistered()

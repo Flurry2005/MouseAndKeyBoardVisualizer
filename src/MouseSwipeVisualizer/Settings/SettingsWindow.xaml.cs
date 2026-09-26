@@ -220,7 +220,8 @@ public partial class SettingsWindow : Window
         try
         {
             string message = await _host.RunCameraActionAsync(action);
-            MessageBox.Show(this, message, "Mouse Swipe Visualizer – camera", MessageBoxButton.OK, MessageBoxImage.Information);
+            bool inUse = message.StartsWith("The camera is working, but another app is using it", StringComparison.Ordinal);
+            MessageBox.Show(this, message, inUse ? "Mouse Swipe Visualizer – camera in use" : "Mouse Swipe Visualizer – camera", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         finally
         {

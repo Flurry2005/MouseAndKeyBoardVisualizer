@@ -44,7 +44,7 @@ public static class CameraCommands
         }
         catch (Exception ex)
         {
-            output.WriteLine($"ERROR: {ex.Message}");
+            output.WriteLine(CameraDiagnostics.IsCameraInUse(ex) ? CameraDiagnostics.CameraInUseMessage : $"ERROR: {ex.Message}");
             Logger.Error("Camera command failed.", ex);
             exitCode = ex is UnauthorizedAccessException ? 5 : 1;
         }
