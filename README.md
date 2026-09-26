@@ -70,7 +70,7 @@ MSI (publish + WiX):
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1
 ```
 
-→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.15.0-x64.msi`
+→ `installer/bin/x64/Release/MouseSwipeVisualizer-3.0.16.0-x64.msi`
 
 Release binaries are deterministic and contain no local build paths.
 
@@ -309,7 +309,12 @@ Security and privacy:
   value and closes after the sign-in (or after 3 minutes).
 * Covers are only downloaded over HTTPS from Spotify's image servers (max 5 MB), into
   `%LocalAppData%\MouseSwipeVisualizer\spotify-covers`, which keeps only the last few covers.
-* It checks at most once per second, whatever the settings, and honours Spotify's rate-limit `Retry-After`.
+* It checks at most once per second, whatever the settings. On a rate limit (HTTP 429) it waits Spotify's
+  `Retry-After` + 1 s and doubles the wait while it keeps being limited (max 15 min). Each 429 is logged as a
+  JSON line, `{"component":"spotify","event":"poll_rate_limited","status":429,"retryAfterSeconds":…,"backoffSeconds":…,
+  "backoffMultiplier":2,"consecutive":…,"requestsLastHour":…}`, plus `poll_recovered` when it works again. The
+  Settings status shows the next attempt and the requests made in the last hour. Spotify's limit is per **Client
+  ID**, so other tools using the same Spotify app share it; give each tool its own app.
   With smart timing a typical song costs a handful of requests instead of one every few seconds.
 
 **Keyboard and privacy:** Raw Input for the keyboard is only registered while `KeyboardEnabled` is on. Only the

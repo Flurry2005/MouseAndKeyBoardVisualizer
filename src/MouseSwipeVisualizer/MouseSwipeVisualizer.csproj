@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Win32 icon of the exe: Start menu, search, Explorer, taskbar. Regenerate with tools/make-icon.ps1. -->
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <Version>3.0.15</Version>
+    <Version>3.0.16</Version>
     <!-- Release binaries carry no local build paths. -->
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildProjectDirectory)=/_/src/MouseSwipeVisualizer</PathMap>

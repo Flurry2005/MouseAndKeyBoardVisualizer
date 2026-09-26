@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using MouseSwipeVisualizer.Settings;
 using MouseSwipeVisualizer.Utilities;
 
@@ -41,6 +42,12 @@ public sealed class SpotifyService : IDisposable
     private double _pollSeconds = AppSettings.DefaultSpotifyPollSeconds;
     private bool _smartTiming = true;
     private SongEndWatch _endWatch;
+
+    // Rate limiting: exponential backoff + request counter for diagnostics (poller thread only).
+    private int _rateLimitStreak;
+    private TimeSpan _lastBackoff;
+    private DateTime _rateLimitedSinceUtc;
+    private readonly Queue<DateTime> _requestTimes = new();
     private bool _enabled;
     private string? _accessToken;
     private DateTime _accessExpiresUtc;
@@ -300,7 +307,20 @@ public sealed class SpotifyService : IDisposable
             return null;
         }
 
+        CountRequest();
         PlaybackResponse response = await SpotifyClient.GetCurrentlyPlayingAsync(access, cancel);
+        if (response.Status != HttpStatusCode.TooManyRequests && _rateLimitStreak > 0)
+        {
+            LogEvent("poll_recovered", new Dictionary<string, object>
+            {
+                ["status"] = (int)response.Status,
+                ["rateLimitedSeconds"] = Math.Round((DateTime.UtcNow - _rateLimitedSinceUtc).TotalSeconds),
+                ["consecutive"] = _rateLimitStreak,
+            });
+            _rateLimitStreak = 0;
+            _lastBackoff = TimeSpan.Zero;
+        }
+
         switch (response.Status)
         {
             case HttpStatusCode.OK when response.Playing != null:
@@ -317,7 +337,7 @@ public sealed class SpotifyService : IDisposable
 
                 TimeSpan next = SpotifySchedule.NextDelay(now, safety, smart, ref _endWatch);
                 _status = $"Connected: {(now.IsPlaying ? "playing" : "paused")} {now.Title}{(now.Artist.Length > 0 ? " – " + now.Artist : string.Empty)}" +
-                          $" · next check {DateTime.Now + next:HH:mm:ss}";
+                          $" · next check {DateTime.Now + next:HH:mm:ss} · {RequestsLastHour()} requests in the last hour";
                 return next;
             case HttpStatusCode.OK:
             case HttpStatusCode.NoContent:
@@ -333,12 +353,68 @@ public sealed class SpotifyService : IDisposable
 
                 return TimeSpan.FromSeconds(1);
             case HttpStatusCode.TooManyRequests:
-                _status = "Spotify rate limit: waiting.";
-                return response.RetryAfter is { } wait && wait > TimeSpan.Zero ? wait : TimeSpan.FromSeconds(30);
+                if (_rateLimitStreak++ == 0)
+                {
+                    _rateLimitedSinceUtc = DateTime.UtcNow;
+                }
+
+                TimeSpan backoff = SpotifySchedule.RateLimitBackoff(response.RetryAfter, _rateLimitStreak, _lastBackoff);
+                _lastBackoff = backoff;
+                LogEvent("poll_rate_limited", new Dictionary<string, object>
+                {
+                    ["status"] = 429,
+                    ["retryAfterSeconds"] = response.RetryAfter is { } ra ? Math.Round(ra.TotalSeconds) : -1,
+                    ["backoffSeconds"] = Math.Round(backoff.TotalSeconds),
+                    ["backoffMultiplier"] = SpotifySchedule.BackoffMultiplier,
+                    ["consecutive"] = _rateLimitStreak,
+                    ["requestsLastHour"] = RequestsLastHour(),
+                });
+                _status = $"Spotify rate limit (429): next try {DateTime.Now + backoff:HH:mm:ss}, waiting {backoff.TotalSeconds:0} s" +
+                          (_rateLimitStreak > 1 ? $" (limited {_rateLimitStreak}× in a row, wait doubled)" : string.Empty) +
+                          $" · {RequestsLastHour()} requests in the last hour";
+                return backoff;
             default:
                 _status = $"Spotify returned {(int)response.Status}; retrying.";
                 return TimeSpan.FromSeconds(15);
         }
+    }
+
+    private void CountRequest()
+    {
+        DateTime now = DateTime.UtcNow;
+        _requestTimes.Enqueue(now);
+        while (_requestTimes.Count > 0 && now - _requestTimes.Peek() > TimeSpan.FromHours(1))
+        {
+            _requestTimes.Dequeue();
+        }
+    }
+
+    private int RequestsLastHour()
+    {
+        DateTime now = DateTime.UtcNow;
+        while (_requestTimes.Count > 0 && now - _requestTimes.Peek() > TimeSpan.FromHours(1))
+        {
+            _requestTimes.Dequeue();
+        }
+
+        return _requestTimes.Count;
+    }
+
+    /// <summary>One structured JSON line in the log (never tokens, IDs or the secret).</summary>
+    private static void LogEvent(string name, Dictionary<string, object> fields)
+    {
+        var line = new Dictionary<string, object>
+        {
+            ["component"] = "spotify",
+            ["event"] = name,
+            ["timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture),
+        };
+        foreach (KeyValuePair<string, object> field in fields)
+        {
+            line[field.Key] = field.Value;
+        }
+
+        Logger.Info(JsonSerializer.Serialize(line));
     }
 
     private async Task<string?> GetAccessTokenAsync(CancellationToken cancel)
@@ -362,6 +438,7 @@ public sealed class SpotifyService : IDisposable
             return null;
         }
 
+        CountRequest();
         SpotifyToken token = await SpotifyClient.RefreshAsync(clientId, secret, refresh, cancel);
         lock (_lock)
         {

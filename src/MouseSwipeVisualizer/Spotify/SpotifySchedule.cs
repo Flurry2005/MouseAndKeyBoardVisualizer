@@ -50,5 +50,26 @@ public static class SpotifySchedule
         return Min(remaining + EndMargin, safetyInterval);
     }
 
+    public const double BackoffMultiplier = 2;
+    public static readonly TimeSpan DefaultRetryAfter = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// Wait after a 429: Spotify's Retry-After (30 s if missing) + 1 s. If the previous attempt was
+    /// rate limited too (<paramref name="consecutive"/> &gt; 1), at least double the previous wait,
+    /// capped at <see cref="MaxBackoff"/>.
+    /// </summary>
+    public static TimeSpan RateLimitBackoff(TimeSpan? retryAfter, int consecutive, TimeSpan previous)
+    {
+        TimeSpan wait = (retryAfter is { } r && r > TimeSpan.Zero ? r : DefaultRetryAfter) + TimeSpan.FromSeconds(1);
+        if (consecutive > 1)
+        {
+            TimeSpan doubled = TimeSpan.FromTicks((long)(previous.Ticks * BackoffMultiplier));
+            wait = doubled > wait ? doubled : wait;
+        }
+
+        return wait < MaxBackoff ? wait : MaxBackoff;
+    }
+
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 }

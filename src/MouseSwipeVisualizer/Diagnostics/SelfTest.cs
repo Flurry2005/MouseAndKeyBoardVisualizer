@@ -1441,6 +1441,14 @@ public static class SelfTest
         r.Check("new song: regular interval while far from its end", Spotify.SpotifySchedule.NextDelay(next, safety, true, ref watch), safety);
         r.Check("paused: regular interval", Spotify.SpotifySchedule.NextDelay(song with { IsPlaying = false }, safety, true, ref watch), safety);
         r.Check("smart timing off: regular interval", Spotify.SpotifySchedule.NextDelay(song, TimeSpan.FromSeconds(3), false, ref watch), TimeSpan.FromSeconds(3));
+        TimeSpan b1 = Spotify.SpotifySchedule.RateLimitBackoff(TimeSpan.FromSeconds(60), 1, TimeSpan.Zero);
+        TimeSpan b2 = Spotify.SpotifySchedule.RateLimitBackoff(TimeSpan.FromSeconds(60), 2, b1);
+        TimeSpan b3 = Spotify.SpotifySchedule.RateLimitBackoff(TimeSpan.FromSeconds(5), 3, b2);
+        TimeSpan bNone = Spotify.SpotifySchedule.RateLimitBackoff(null, 1, TimeSpan.Zero);
+        TimeSpan bCap = Spotify.SpotifySchedule.RateLimitBackoff(TimeSpan.FromSeconds(60), 9, TimeSpan.FromMinutes(10));
+        r.Line($"    429 backoff: {b1.TotalSeconds}, {b2.TotalSeconds}, {b3.TotalSeconds} s; no Retry-After {bNone.TotalSeconds} s; cap {bCap.TotalSeconds} s");
+        r.Check("429: Retry-After + 1 s, doubled while it repeats, capped at 15 min",
+            b1.TotalSeconds == 61 && b2.TotalSeconds == 122 && b3.TotalSeconds == 244 && bNone.TotalSeconds == 31 && bCap.TotalSeconds == 900, true);
         var repeat = default(Spotify.SongEndWatch);
         Spotify.SpotifySchedule.NextDelay(song, safety, true, ref repeat);
         TimeSpan replay = Spotify.SpotifySchedule.NextDelay(song with { ProgressMs = 5000 }, safety, true, ref repeat);
